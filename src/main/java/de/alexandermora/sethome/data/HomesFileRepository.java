@@ -4,21 +4,17 @@ import com.electronwill.nightconfig.core.CommentedConfig;
 import com.electronwill.nightconfig.core.UnmodifiableConfig;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.io.WritingMode;
-import de.alexandermora.sethome.SetHomeMod;
+import de.alexandermora.sethome.config.SetHomeConfig;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TreeSet;
-import java.util.UUID;
+import java.util.*;
 
+import static de.alexandermora.sethome.SetHomeMod.LOGGER;
 import static java.nio.file.Files.*;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 public class HomesFileRepository {
 
@@ -32,17 +28,14 @@ public class HomesFileRepository {
     }
 
     public void load() {
-        SetHomeMod.LOGGER.info("Loading homes...");
+        LOGGER.info("Type storage: {}", SetHomeConfig.STORAGE_MODE.get().name());
+        LOGGER.info("Loading homes...");
         ensureFileExists();
         homes.clear();
 
         try {
             if (size(filePath) == 0L) {
-                writeString(
-                        filePath,
-                        "# SetHome data file\n",
-                        StandardCharsets.UTF_8
-                );
+                writeString(filePath, "# SetHome data file\n", StandardCharsets.UTF_8);
                 return;
             }
         } catch (IOException e) {
@@ -54,7 +47,7 @@ public class HomesFileRepository {
 
             Object rawPlayers = config.get(PLAYERS_KEY);
             if (!(rawPlayers instanceof UnmodifiableConfig playersConfig)) {
-                SetHomeMod.LOGGER.info("No players section found in {}", filePath);
+                LOGGER.info("No players section found in {}", filePath);
                 return;
             }
 
@@ -63,7 +56,7 @@ public class HomesFileRepository {
                 try {
                     playerId = UUID.fromString(playerEntry.getKey());
                 } catch (IllegalArgumentException ex) {
-                    SetHomeMod.LOGGER.warn("Invalid UUID key in homes file: {}", playerEntry.getKey());
+                    LOGGER.warn("Invalid UUID key in homes file: {}", playerEntry.getKey());
                     continue;
                 }
 
@@ -81,21 +74,38 @@ public class HomesFileRepository {
                     if (!(rawHomeValue instanceof UnmodifiableConfig rawHome)) {
                         continue;
                     }
-
+                    LOGGER.info(
+                            "Raw home '{}' -> dimension={}, x={}, y={}, z={}, yaw={}, pitch={}",
+                            homeName,
+                            rawHome.get("dimension"),
+                            rawHome.get("x"),
+                            rawHome.get("y"),
+                            rawHome.get("z"),
+                            rawHome.get("yaw"),
+                            rawHome.get("pitch")
+                    );
                     try {
-                        String dimension = String.valueOf(rawHome.get("dimension"));
+                        String dimension = rawHome.get("dimension").toString();
                         double x = toDouble(rawHome.get("x"));
                         double y = toDouble(rawHome.get("y"));
                         double z = toDouble(rawHome.get("z"));
-                        float yaw = (float) toDouble(rawHome.get("yaw"));
-                        float pitch = (float) toDouble(rawHome.get("pitch"));
+                        float yaw = toFloat(rawHome.get("yaw"));
+                        float pitch = toFloat(rawHome.get("pitch"));
 
-                        parsedHomes.put(
+                        parsedHomes.put(homeName, HomeLocation.fromDimensionString(dimension, x, y, z, yaw, pitch));
+
+                        LOGGER.info(
+                                "Set home '{}' -> dimension={}, x={}, y={}, z={}, yaw={}, pitch={}",
                                 homeName,
-                                HomeLocation.fromDimensionString(dimension, x, y, z, yaw, pitch)
+                                parsedHomes.get("dimension"),
+                                parsedHomes.get("x"),
+                                parsedHomes.get("y"),
+                                parsedHomes.get("z"),
+                                parsedHomes.get("yaw"),
+                                parsedHomes.get("pitch")
                         );
                     } catch (Exception ex) {
-                        SetHomeMod.LOGGER.warn("Failed to read home '{}' for player {}", homeName, playerId, ex);
+                        LOGGER.warn("Failed to read home '{}' for player {}", homeName, playerId, ex);
                     }
                 }
 
@@ -104,7 +114,7 @@ public class HomesFileRepository {
                 }
             }
 
-            SetHomeMod.LOGGER.info("Loaded homes for {} player(s)", homes.size());
+            LOGGER.info("Loaded homes for {} player(s)", homes.size());
         } catch (com.electronwill.nightconfig.core.io.ParsingException e) {
             backupAndResetBrokenFile(e);
         }
@@ -128,7 +138,7 @@ public class HomesFileRepository {
                     HomeLocation home = homeEntry.getValue();
 
                     CommentedConfig homeConfig = CommentedConfig.inMemory();
-                    homeConfig.set("dimension", dimensionKeyToString(home.dimension()));
+                    homeConfig.set("dimension", home.dimension());
                     homeConfig.set("x", home.x());
                     homeConfig.set("y", home.y());
                     homeConfig.set("z", home.z());
@@ -200,11 +210,7 @@ public class HomesFileRepository {
             createDirectories(filePath.getParent());
 
             if (notExists(filePath)) {
-                writeString(
-                        filePath,
-                        "# SetHome data file\n",
-                        StandardCharsets.UTF_8
-                );
+                writeString(filePath, "# SetHome data file\n", StandardCharsets.UTF_8);
             }
         } catch (IOException e) {
             throw new RuntimeException("Failed to create config file: " + filePath, e);
@@ -225,6 +231,14 @@ public class HomesFileRepository {
         return Double.parseDouble(String.valueOf(value));
     }
 
+    private static float toFloat(Object value) {
+        if (value instanceof Number number) {
+            return number.floatValue();
+        }
+        return Float.parseFloat(String.valueOf(value));
+    }
+
+
     private static String normalizeHomeName(String input) {
         return input == null ? "" : input.trim().toLowerCase(Locale.ROOT);
     }
@@ -233,15 +247,9 @@ public class HomesFileRepository {
     private void backupAndResetBrokenFile(Exception cause) {
         try {
             Path brokenPath = filePath.resolveSibling(filePath.getFileName() + ".broken");
-            copy(filePath, brokenPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            copy(filePath, brokenPath, REPLACE_EXISTING);
 
-            writeString(
-                    filePath,
-                    "# SetHome data file\n",
-                    StandardCharsets.UTF_8,
-                    StandardOpenOption.TRUNCATE_EXISTING,
-                    StandardOpenOption.CREATE
-            );
+            writeString(filePath, "# SetHome data file\n", StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
 
             homes.clear();
         } catch (IOException e) {
@@ -249,19 +257,4 @@ public class HomesFileRepository {
         }
     }
 
-    private static String dimensionKeyToString(net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> key) {
-        String text = String.valueOf(key);
-
-        // Typical format:
-        // ResourceKey[minecraft:dimension / minecraft:overworld]
-        int slash = text.indexOf('/');
-        int end = text.lastIndexOf(']');
-
-        if (slash >= 0 && end > slash) {
-            return text.substring(slash + 1, end).trim();
-        }
-
-        // Fallback for unexpected formats
-        return text;
-    }
 }
