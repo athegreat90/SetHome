@@ -15,18 +15,16 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
 
 @Mod(SetHomeMod.MOD_ID)
-public class SetHomeMod {
+public final class SetHomeMod {
 
     public static final String MOD_ID = "sethome";
-
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
     public SetHomeMod(IEventBus modBus, ModContainer modContainer) {
-        var path = Path.of(MOD_ID, "sethome-common.toml");
         modContainer.registerConfig(
                 ModConfig.Type.COMMON,
                 SetHomeConfig.SPEC,
-                path.toString()
+                Path.of(MOD_ID, "sethome-common.toml").toString()
         );
 
         NeoForge.EVENT_BUS.addListener(HomeCommands::register);
@@ -34,7 +32,6 @@ public class SetHomeMod {
     }
 
     private void onServerStarting(ServerStartingEvent event) {
-        Path configDir = Path.of("config", MOD_ID);
-        HomeStorageService.initialize(configDir);
+        HomeStorageService.initialize(Path.of("config", MOD_ID));
     }
 }

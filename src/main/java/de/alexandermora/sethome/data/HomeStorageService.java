@@ -1,7 +1,6 @@
 package de.alexandermora.sethome.data;
 
 import de.alexandermora.sethome.config.SetHomeConfig;
-import net.minecraft.server.MinecraftServer;
 
 import java.nio.file.Path;
 import java.util.Objects;
@@ -15,42 +14,37 @@ public final class HomeStorageService {
     private HomeStorageService() {
     }
 
-    public static void initialize(Path configDir) {
+    public static synchronized void initialize(Path configDir) {
         if (fileRepository == null) {
             fileRepository = new HomesFileRepository(configDir);
             fileRepository.load();
         }
     }
 
-    public static boolean setHome(MinecraftServer server, UUID playerId, String homeName, HomeLocation location) {
-        ensureInitialized();
+    public static boolean setHome(UUID playerId, String homeName, HomeLocation location) {
+        HomesFileRepository repository = repository();
 
-        int maxHomes = SetHomeConfig.MAX_HOMES_PER_PLAYER.get();
-        HomeLocation existing = fileRepository.getHome(playerId, homeName);
-
-        if (existing == null && fileRepository.countHomes(playerId) >= maxHomes) {
+        HomeLocation existing = repository.getHome(playerId, homeName);
+        if (existing == null && repository.countHomes(playerId) >= SetHomeConfig.MAX_HOMES_PER_PLAYER.get()) {
             throw new IllegalStateException("Maximum number of homes reached.");
         }
 
-        return fileRepository.setHome(playerId, homeName, location);
+        return repository.setHome(playerId, homeName, location);
     }
 
-    public static HomeLocation getHome(MinecraftServer server, UUID playerId, String homeName) {
-        ensureInitialized();
-        return fileRepository.getHome(playerId, homeName);
+    public static HomeLocation getHome(UUID playerId, String homeName) {
+        return repository().getHome(playerId, homeName);
     }
 
-    public static Set<String> getHomes(MinecraftServer server, UUID playerId) {
-        ensureInitialized();
-        return fileRepository.getHomes(playerId);
+    public static Set<String> getHomes(UUID playerId) {
+        return repository().getHomes(playerId);
     }
 
-    public static boolean deleteHome(MinecraftServer server, UUID playerId, String homeName) {
-        ensureInitialized();
-        return fileRepository.deleteHome(playerId, homeName);
+    public static boolean deleteHome(UUID playerId, String homeName) {
+        return repository().deleteHome(playerId, homeName);
     }
 
-    private static void ensureInitialized() {
-        Objects.requireNonNull(fileRepository, "HomeStorageService has not been initialized yet.");
+    private static HomesFileRepository repository() {
+        return Objects.requireNonNull(fileRepository, "HomeStorageService has not been initialized yet.");
     }
 }

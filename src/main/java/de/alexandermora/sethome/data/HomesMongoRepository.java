@@ -23,8 +23,8 @@ public class HomesMongoRepository {
 
     public void load() {
         try (MongoClient mongoClient = MongoClients.create(uri)) {
-            MongoDatabase database = mongoClient.getDatabase("sethome");
-            MongoCollection<Document> collection = database.getCollection("movies");
+            MongoDatabase database = mongoClient.getDatabase("minecraft");
+            MongoCollection<Document> collection = database.getCollection("homes");
             Document doc = collection.find(eq("title", "Back to the Future")).first();
             if (doc != null) {
                 System.out.println(doc.toJson());
