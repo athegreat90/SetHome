@@ -23,12 +23,33 @@ repositories {
 }
 
 def mongoDriverVersion = '5.8.0'
+def sqliteDriverVersion = '3.49.1.0'
 
 dependencies {
     jarJar(implementation("org.mongodb:mongodb-driver-sync:${mongoDriverVersion}")) {
         version {
             strictly '[5.8,5.9)'
             prefer mongoDriverVersion
+        }
+    }
+    // mongodb-driver-sync depends on these transitively, but jarJar does not embed transitive
+    // dependencies automatically, so each jarred artifact must be declared explicitly.
+    jarJar(implementation("org.mongodb:mongodb-driver-core:${mongoDriverVersion}")) {
+        version {
+            strictly '[5.8,5.9)'
+            prefer mongoDriverVersion
+        }
+    }
+    jarJar(implementation("org.mongodb:bson:${mongoDriverVersion}")) {
+        version {
+            strictly '[5.8,5.9)'
+            prefer mongoDriverVersion
+        }
+    }
+    jarJar(implementation("org.xerial:sqlite-jdbc:${sqliteDriverVersion}")) {
+        version {
+            strictly "[${sqliteDriverVersion},3.50)"
+            prefer sqliteDriverVersion
         }
     }
 }
@@ -111,7 +132,7 @@ publishing {
     }
     repositories {
         maven {
-            url "file://${project.projectDir}/repo"
+            url = "file://${project.projectDir}/repo"
         }
     }
 }

@@ -24,7 +24,7 @@ import java.util.UUID;
 
 import static de.alexandermora.sethome.SetHomeMod.LOGGER;
 
-public final class HomesFileRepository {
+public final class HomesFileRepository implements HomesRepository {
 
     private static final String PLAYERS_KEY = "players";
     private static final DateTimeFormatter BACKUP_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
@@ -36,6 +36,7 @@ public final class HomesFileRepository {
         this.filePath = configDir.resolve("sethome.toml");
     }
 
+    @Override
     public synchronized void load() {
         ensureFileExists();
         homes.clear();
@@ -127,6 +128,7 @@ public final class HomesFileRepository {
         }
     }
 
+    @Override
     public synchronized boolean setHome(UUID playerId, String homeName, HomeLocation location) {
         String normalizedName = normalizeHomeName(homeName);
         if (normalizedName.isBlank()) {
@@ -143,14 +145,17 @@ public final class HomesFileRepository {
         return true;
     }
 
+    @Override
     public synchronized HomeLocation getHome(UUID playerId, String homeName) {
         return homes.getOrDefault(playerId, Map.of()).get(normalizeHomeName(homeName));
     }
 
+    @Override
     public synchronized Set<String> getHomes(UUID playerId) {
         return Collections.unmodifiableSet(new TreeSet<>(homes.getOrDefault(playerId, Map.of()).keySet()));
     }
 
+    @Override
     public synchronized boolean deleteHome(UUID playerId, String homeName) {
         Map<String, HomeLocation> playerHomes = homes.get(playerId);
         if (playerHomes == null || playerHomes.remove(normalizeHomeName(homeName)) == null) {
@@ -164,8 +169,22 @@ public final class HomesFileRepository {
         return true;
     }
 
+    @Override
     public synchronized int countHomes(UUID playerId) {
         return homes.getOrDefault(playerId, Map.of()).size();
+    }
+
+    @Override
+    public synchronized void close() {
+        // Nothing to release: state is flushed to disk on every mutation already.
+    }
+
+    public synchronized Map<UUID, Map<String, HomeLocation>> exportAll() {
+        Map<UUID, Map<String, HomeLocation>> copy = new HashMap<>();
+        for (Map.Entry<UUID, Map<String, HomeLocation>> entry : homes.entrySet()) {
+            copy.put(entry.getKey(), new HashMap<>(entry.getValue()));
+        }
+        return copy;
     }
 
     private void ensureFileExists() {

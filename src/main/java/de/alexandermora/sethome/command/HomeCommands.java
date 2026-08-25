@@ -14,7 +14,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Relative;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
@@ -133,7 +132,7 @@ public final class HomeCommands {
                     home.x(),
                     home.y(),
                     home.z(),
-                    Set.<Relative>of(),
+                    Set.of(),
                     home.yaw(),
                     home.pitch(),
                     true
