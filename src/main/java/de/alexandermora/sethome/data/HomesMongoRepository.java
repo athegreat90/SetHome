@@ -135,12 +135,25 @@ public final class HomesMongoRepository implements HomesRepository {
     private static HomeLocation fromDocument(Document doc) {
         return new HomeLocation(
                 doc.getString(FIELD_DIMENSION),
-                doc.getDouble(FIELD_X),
-                doc.getDouble(FIELD_Y),
-                doc.getDouble(FIELD_Z),
-                doc.getDouble(FIELD_YAW).floatValue(),
-                doc.getDouble(FIELD_PITCH).floatValue()
+                getAsDouble(doc, FIELD_X),
+                getAsDouble(doc, FIELD_Y),
+                getAsDouble(doc, FIELD_Z),
+                (float) getAsDouble(doc, FIELD_YAW),
+                (float) getAsDouble(doc, FIELD_PITCH)
         );
+    }
+
+    /**
+     * Reads a numeric field as a double regardless of whether it was stored as a
+     * BSON Int32/Int64/Double, since legacy or externally-written documents may not
+     * use the exact Double type that {@link Document#getDouble(Object)} requires.
+     */
+    private static double getAsDouble(Document doc, String field) {
+        Object value = doc.get(field);
+        if (!(value instanceof Number number)) {
+            throw new IllegalStateException("Missing or non-numeric field '" + field + "' in home document");
+        }
+        return number.doubleValue();
     }
 
     private static String normalizeHomeName(String input) {
