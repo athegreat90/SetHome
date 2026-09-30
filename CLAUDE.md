@@ -154,7 +154,7 @@ Package root: `de.alexandermora.sethome`, all Kotlin under `src/main/kotlin/`.
 - `config/StorageMode` — `enum class StorageMode { FILE, MONGODB, SQLITE }`, the single source of truth for
   selectable backends, referenced by both `SetHomeConfig.STORAGE_MODE` and `HomeStorageService`. There is no
   separate/unused second enum in this codebase — if you see a reference elsewhere to a `HomeStorageMode` enum or
-  a `MARIADB` mode, that's stale documentation, not current code.
+  a `MONGODB` mode, that's stale documentation, not current code.
 
 Every repository method that was `synchronized` in the original Java is now annotated `@Synchronized` (Kotlin has
 no `synchronized` modifier) — don't drop these when editing repository methods, since `HomeStorageService` and the
