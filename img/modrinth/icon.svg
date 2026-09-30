@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" shape-rendering="crispEdges" role="img" aria-labelledby="title desc">
+  <title id="title">SetHome</title>
+  <desc id="desc">An original pixel-art house with a glowing cyan teleport doorway on a floating grass block, framed by a dark stepped badge.</desc>
+
+  <!-- Stepped badge; the corner pixels remain transparent. -->
+  <polygon fill="#0b1422" points="48,16 464,16 464,32 480,32 480,48 496,48 496,464 480,464 480,480 464,480 464,496 48,496 48,480 32,480 32,464 16,464 16,48 32,48 32,32 48,32"/>
+  <polygon fill="#21364b" points="56,32 456,32 456,48 472,48 472,456 456,456 456,472 56,472 56,456 40,456 40,56 56,56"/>
+  <polygon fill="#182b3e" points="56,48 456,48 456,64 464,64 464,448 448,448 448,464 64,464 64,448 48,448 48,64 56,64"/>
+
+  <!-- Teleport sparks and a quiet pixel shadow. -->
+  <rect x="72" y="136" width="16" height="16" fill="#477089"/>
+  <rect x="96" y="272" width="8" height="8" fill="#50dfdc"/>
+  <rect x="416" y="264" width="16" height="16" fill="#50dfdc"/>
+  <polygon fill="#8bfff0" points="400,88 416,88 416,104 432,104 432,120 416,120 416,136 400,136 400,120 384,120 384,104 400,104"/>
+  <rect x="120" y="432" width="272" height="16" fill="#101e30"/>
+
+  <!-- Floating grass block. -->
+  <polygon fill="#0b1422" points="88,336 424,336 424,384 408,384 408,416 392,416 392,432 120,432 120,416 104,416 104,384 88,384"/>
+  <rect x="112" y="368" width="288" height="40" fill="#926044"/>
+  <rect x="128" y="408" width="256" height="8" fill="#694635"/>
+  <rect x="112" y="392" width="288" height="16" fill="#784e39"/>
+  <rect x="144" y="384" width="24" height="16" fill="#b07b52"/>
+  <rect x="184" y="400" width="16" height="8" fill="#b07b52"/>
+  <rect x="344" y="380" width="24" height="12" fill="#b07b52"/>
+  <rect x="96" y="344" width="320" height="24" fill="#76cc62"/>
+  <rect x="96" y="344" width="320" height="8" fill="#b4ed83"/>
+  <rect x="112" y="368" width="32" height="8" fill="#4b984f"/>
+  <rect x="176" y="368" width="32" height="8" fill="#4b984f"/>
+  <rect x="320" y="368" width="32" height="8" fill="#4b984f"/>
+  <rect x="384" y="368" width="16" height="8" fill="#4b984f"/>
+
+  <!-- House silhouette and warm walls. -->
+  <rect x="128" y="208" width="256" height="144" fill="#0b1422"/>
+  <rect x="144" y="224" width="224" height="120" fill="#efe6cb"/>
+  <rect x="144" y="224" width="224" height="16" fill="#bba98d"/>
+  <rect x="144" y="320" width="224" height="24" fill="#d3c2a1"/>
+  <rect x="144" y="240" width="16" height="104" fill="#ddccaa"/>
+  <rect x="352" y="240" width="16" height="104" fill="#ddccaa"/>
+
+  <!-- A stair-stepped roof, readable even at small icon sizes. -->
+  <polygon fill="#e5a04b" stroke="#0b1422" stroke-width="16" stroke-linejoin="miter" points="104,216 128,216 128,192 152,192 152,168 176,168 176,144 200,144 200,120 224,120 224,96 288,96 288,120 312,120 312,144 336,144 336,168 360,168 360,192 384,192 384,216 408,216 408,232 104,232"/>
+  <rect x="224" y="104" width="56" height="16" fill="#ffdb83"/>
+  <rect x="200" y="128" width="32" height="16" fill="#ffdb83"/>
+  <rect x="176" y="152" width="32" height="16" fill="#ffdb83"/>
+  <rect x="152" y="176" width="32" height="16" fill="#ffdb83"/>
+  <rect x="128" y="200" width="32" height="16" fill="#ffdb83"/>
+  <rect x="160" y="216" width="240" height="8" fill="#bd743c"/>
+
+  <!-- Two simple windows. -->
+  <rect x="160" y="256" width="40" height="48" fill="#77543c"/>
+  <rect x="168" y="264" width="24" height="24" fill="#66ced3"/>
+  <rect x="168" y="264" width="16" height="8" fill="#c1fff2"/>
+  <rect x="312" y="256" width="40" height="48" fill="#77543c"/>
+  <rect x="320" y="264" width="24" height="24" fill="#66ced3"/>
+  <rect x="320" y="264" width="16" height="8" fill="#c1fff2"/>
+
+  <!-- The home is also a teleport destination: a luminous portal doorway. -->
+  <rect x="208" y="240" width="96" height="112" fill="#163b49"/>
+  <rect x="216" y="248" width="80" height="104" fill="#48dccc"/>
+  <rect x="224" y="256" width="64" height="96" fill="#acfce1"/>
+  <rect x="232" y="264" width="48" height="88" fill="#153e54"/>
+  <rect x="240" y="272" width="32" height="80" fill="#206078"/>
+  <rect x="248" y="280" width="16" height="56" fill="#2d8c98"/>
+  <rect x="224" y="352" width="64" height="8" fill="#d7fff0"/>
+  <rect x="216" y="360" width="80" height="8" fill="#64ecd3"/>
+  <rect x="208" y="376" width="96" height="8" fill="#369f9d"/>
+</svg>

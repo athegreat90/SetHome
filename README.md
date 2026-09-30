@@ -68,6 +68,32 @@ Example:
 /delhome mine
 ```
 
+## Screenshots
+
+### Save a home
+
+`/sethome desert` saves your location and facing direction.
+
+![The /sethome desert command and its Home 'desert' saved confirmation in a badlands biome.](img/modrinth/save-home.png)
+
+### List your homes
+
+`/homes` shows your saved locations.
+
+![The /homes command listing the saved homes desert and jungle.](img/modrinth/list-homes.png)
+
+### Return home
+
+`/home desert` teleports you to your saved location.
+
+![Back at the saved desert location with the Teleported to home 'desert' confirmation in chat.](img/modrinth/teleport-home.png)
+
+### Delete a home
+
+`/delhome cave` removes a saved location.
+
+![The /delhome cave command and its Home 'cave' deleted confirmation.](img/modrinth/delete-home.png)
+
 ## Configuration
 
 The configuration file is generated at `config/sethome/sethome-common.toml`. Its default settings are:
