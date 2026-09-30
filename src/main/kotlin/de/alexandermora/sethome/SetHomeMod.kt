@@ -44,10 +44,10 @@ class SetHomeMod(modContainer: ModContainer) {
         // Minecraft 26.3 onward); loader 11.x (26.1.2/26.2) only has COMMON. Resolving by name at runtime
         // lets one compiled jar register its config correctly across both loader generations.
         private fun resolveConfigType(): ModConfig.Type =
-            try {
-                ModConfig.Type.valueOf("LOCAL")
-            } catch (e: IllegalArgumentException) {
-                ModConfig.Type.valueOf("COMMON")
-            }
+            runCatching { ModConfig.Type.valueOf("LOCAL") }
+                .getOrElse { ex ->
+                    if (ex !is IllegalArgumentException) throw ex
+                    ModConfig.Type.valueOf("COMMON")
+                }
     }
 }

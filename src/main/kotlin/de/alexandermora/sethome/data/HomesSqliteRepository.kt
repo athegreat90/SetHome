@@ -16,16 +16,18 @@ class HomesSqliteRepository(private val dbFilePath: Path) : HomesRepository {
 
     @Synchronized
     override fun load() {
-        try {
+        runCatching {
             Files.createDirectories(dbFilePath.toAbsolutePath().parent)
-        } catch (ex: IOException) {
+        }.onFailure { ex ->
+            if (ex !is IOException) throw ex
             throw IllegalStateException("Failed to create directory for SQLite database $dbFilePath", ex)
         }
 
-        try {
+        runCatching {
             connection = DriverManager.getConnection("jdbc:sqlite:$dbFilePath")
             connection.prepareStatement(CREATE_TABLE).use { it.execute() }
-        } catch (ex: SQLException) {
+        }.onFailure { ex ->
+            if (ex !is SQLException) throw ex
             throw IllegalStateException("Failed to open SQLite database $dbFilePath", ex)
         }
     }
@@ -35,7 +37,7 @@ class HomesSqliteRepository(private val dbFilePath: Path) : HomesRepository {
         val normalizedName = normalizeHomeName(homeName)
         require(normalizedName.isNotBlank()) { "Home name cannot be blank" }
 
-        try {
+        return runCatching {
             connection.prepareStatement(INSERT_HOME).use { statement ->
                 statement.setString(1, playerId.toString())
                 statement.setString(2, normalizedName)
@@ -45,43 +47,46 @@ class HomesSqliteRepository(private val dbFilePath: Path) : HomesRepository {
                 statement.setDouble(6, location.z)
                 statement.setDouble(7, location.yaw.toDouble())
                 statement.setDouble(8, location.pitch.toDouble())
-                return statement.executeUpdate() > 0
+                statement.executeUpdate() > 0
             }
-        } catch (ex: SQLException) {
+        }.onFailure { ex ->
+            if (ex !is SQLException) throw ex
             throw IllegalStateException("Failed to save home '$normalizedName' to SQLite", ex)
-        }
+        }.getOrThrow()
     }
 
     @Synchronized
     override fun getHome(playerId: UUID, homeName: String): HomeLocation? {
         val normalizedName = normalizeHomeName(homeName)
-        try {
+        return runCatching {
             connection.prepareStatement(SELECT_HOME).use { statement ->
                 statement.setString(1, playerId.toString())
                 statement.setString(2, normalizedName)
                 statement.executeQuery().use { resultSet ->
                     if (!resultSet.next()) {
-                        return null
+                        null
+                    } else {
+                        HomeLocation(
+                            resultSet.getString(COLUMN_DIMENSION),
+                            resultSet.getDouble(COLUMN_X),
+                            resultSet.getDouble(COLUMN_Y),
+                            resultSet.getDouble(COLUMN_Z),
+                            resultSet.getDouble(COLUMN_YAW).toFloat(),
+                            resultSet.getDouble(COLUMN_PITCH).toFloat()
+                        )
                     }
-                    return HomeLocation(
-                        resultSet.getString(COLUMN_DIMENSION),
-                        resultSet.getDouble(COLUMN_X),
-                        resultSet.getDouble(COLUMN_Y),
-                        resultSet.getDouble(COLUMN_Z),
-                        resultSet.getDouble(COLUMN_YAW).toFloat(),
-                        resultSet.getDouble(COLUMN_PITCH).toFloat()
-                    )
                 }
             }
-        } catch (ex: SQLException) {
+        }.onFailure { ex ->
+            if (ex !is SQLException) throw ex
             throw IllegalStateException("Failed to read home '$normalizedName' from SQLite", ex)
-        }
+        }.getOrThrow()
     }
 
     @Synchronized
     override fun getHomes(playerId: UUID): Set<String> {
         val names = sortedSetOf<String>()
-        try {
+        runCatching {
             connection.prepareStatement(SELECT_HOME_NAMES).use { statement ->
                 statement.setString(1, playerId.toString())
                 statement.executeQuery().use { resultSet ->
@@ -90,7 +95,8 @@ class HomesSqliteRepository(private val dbFilePath: Path) : HomesRepository {
                     }
                 }
             }
-        } catch (ex: SQLException) {
+        }.onFailure { ex ->
+            if (ex !is SQLException) throw ex
             throw IllegalStateException("Failed to list homes for player $playerId from SQLite", ex)
         }
         return names
@@ -99,51 +105,52 @@ class HomesSqliteRepository(private val dbFilePath: Path) : HomesRepository {
     @Synchronized
     override fun deleteHome(playerId: UUID, homeName: String): Boolean {
         val normalizedName = normalizeHomeName(homeName)
-        try {
+        return runCatching {
             connection.prepareStatement(DELETE_HOME).use { statement ->
                 statement.setString(1, playerId.toString())
                 statement.setString(2, normalizedName)
-                return statement.executeUpdate() > 0
+                statement.executeUpdate() > 0
             }
-        } catch (ex: SQLException) {
+        }.onFailure { ex ->
+            if (ex !is SQLException) throw ex
             throw IllegalStateException("Failed to delete home '$normalizedName' from SQLite", ex)
-        }
+        }.getOrThrow()
     }
 
     @Synchronized
-    override fun countHomes(playerId: UUID): Int {
-        try {
+    override fun countHomes(playerId: UUID): Int =
+        runCatching {
             connection.prepareStatement(COUNT_HOMES).use { statement ->
                 statement.setString(1, playerId.toString())
                 statement.executeQuery().use { resultSet ->
-                    return if (resultSet.next()) resultSet.getInt(1) else 0
+                    if (resultSet.next()) resultSet.getInt(1) else 0
                 }
             }
-        } catch (ex: SQLException) {
+        }.onFailure { ex ->
+            if (ex !is SQLException) throw ex
             throw IllegalStateException("Failed to count homes for player $playerId from SQLite", ex)
-        }
-    }
+        }.getOrThrow()
 
     @Synchronized
     override fun close() {
         if (!::connection.isInitialized) {
             return
         }
-        try {
-            connection.close()
-        } catch (ex: SQLException) {
-            SetHomeMod.LOGGER.warn("Failed to close SQLite connection to {}", dbFilePath, ex)
-        }
+        runCatching { connection.close() }
+            .onFailure { ex ->
+                if (ex !is SQLException) throw ex
+                SetHomeMod.LOGGER.warn("Failed to close SQLite connection to {}", dbFilePath, ex)
+            }
     }
 
     companion object {
         init {
             // jarJar-shaded service-loader resources have occasionally failed to auto-register the driver.
-            try {
-                Class.forName("org.sqlite.JDBC")
-            } catch (ex: ClassNotFoundException) {
-                throw ExceptionInInitializerError(ex)
-            }
+            runCatching { Class.forName("org.sqlite.JDBC") }
+                .onFailure { ex ->
+                    if (ex !is ClassNotFoundException) throw ex
+                    throw ExceptionInInitializerError(ex)
+                }
         }
 
         private const val COLUMN_HOME_NAME = "home_name"

@@ -27,10 +27,11 @@ object HomeStorageService {
             selected = repo
         } else {
             val dbRepository = createDbRepository(mode, configDir)
-            selected = try {
+            selected = runCatching {
                 dbRepository.load()
                 dbRepository
-            } catch (ex: RuntimeException) {
+            }.getOrElse { ex ->
+                if (ex !is RuntimeException) throw ex
                 SetHomeMod.LOGGER.error("Failed to initialize {} storage backend; falling back to FILE.", mode, ex)
                 val repo = HomesFileRepository(configDir)
                 repo.load()

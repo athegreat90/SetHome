@@ -16,13 +16,14 @@ internal object HomeMigration {
                     continue
                 }
 
-                try {
+                runCatching {
                     if (target.setHome(playerId, homeName, home)) {
                         migrated++
                     } else {
                         skipped++
                     }
-                } catch (ex: RuntimeException) {
+                }.onFailure { ex ->
+                    if (ex !is RuntimeException) throw ex
                     SetHomeMod.LOGGER.error("Failed to migrate home '{}' for player {}", homeName, playerId, ex)
                 }
             }

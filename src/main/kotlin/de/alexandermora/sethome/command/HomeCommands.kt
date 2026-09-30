@@ -59,13 +59,13 @@ object HomeCommands {
     }
 
     private fun setHome(source: CommandSourceStack, rawName: String): Int {
-        val player: ServerPlayer
-        try {
-            player = source.playerOrException
-        } catch (ex: Exception) {
-            source.sendFailure(Component.literal("This command can only be used by a player."))
-            return 0
-        }
+        val player: ServerPlayer = runCatching { source.playerOrException }
+            .onFailure { ex ->
+                if (ex !is Exception) throw ex
+                source.sendFailure(Component.literal("This command can only be used by a player."))
+                return 0
+            }
+            .getOrThrow()
 
         val name = normalizeHomeName(rawName)
         if (name.isBlank()) {
@@ -83,7 +83,7 @@ object HomeCommands {
             player.getXRot()
         )
 
-        try {
+        runCatching {
             val created = HomeStorageService.setHome(player.getUUID(), name, location)
             if (!created) {
                 source.sendFailure(
@@ -91,13 +91,19 @@ object HomeCommands {
                 )
                 return 0
             }
-        } catch (ex: IllegalStateException) {
-            source.sendFailure(Component.literal(ex.message ?: "Failed to save home '$name'."))
-            return 0
-        } catch (ex: RuntimeException) {
-            SetHomeMod.LOGGER.error("Failed to save home '{}' for {}", name, player.getUUID(), ex)
-            source.sendFailure(Component.literal("Failed to save home '$name'."))
-            return 0
+        }.onFailure { ex ->
+            when (ex) {
+                is IllegalStateException -> {
+                    source.sendFailure(Component.literal(ex.message ?: "Failed to save home '$name'."))
+                    return 0
+                }
+                is RuntimeException -> {
+                    SetHomeMod.LOGGER.error("Failed to save home '{}' for {}", name, player.getUUID(), ex)
+                    source.sendFailure(Component.literal("Failed to save home '$name'."))
+                    return 0
+                }
+                else -> throw ex
+            }
         }
 
         source.sendSuccess({ Component.literal("Home '$name' saved.") }, false)
@@ -105,13 +111,13 @@ object HomeCommands {
     }
 
     private fun teleportHome(source: CommandSourceStack, rawName: String): Int {
-        val player: ServerPlayer
-        try {
-            player = source.playerOrException
-        } catch (ex: Exception) {
-            source.sendFailure(Component.literal("This command can only be used by a player."))
-            return 0
-        }
+        val player: ServerPlayer = runCatching { source.playerOrException }
+            .onFailure { ex ->
+                if (ex !is Exception) throw ex
+                source.sendFailure(Component.literal("This command can only be used by a player."))
+                return 0
+            }
+            .getOrThrow()
 
         val name = normalizeHomeName(rawName)
         val home = HomeStorageService.getHome(player.getUUID(), name)
@@ -121,25 +127,25 @@ object HomeCommands {
         }
 
         val server = player.level().server
-        val targetLevel: ServerLevel?
-        try {
+        val targetLevel: ServerLevel? = runCatching {
             val dimensionKey = ResourceKey.create(
                 Registries.DIMENSION,
                 Identifier.parse(HomeLocation.normalizeDimension(home.dimension))
             )
-            targetLevel = server.getLevel(dimensionKey)
-        } catch (ex: RuntimeException) {
+            server.getLevel(dimensionKey)
+        }.onFailure { ex ->
+            if (ex !is RuntimeException) throw ex
             SetHomeMod.LOGGER.warn("Invalid dimension '{}' for home '{}'", home.dimension, name, ex)
             source.sendFailure(Component.literal("Home '$name' has an invalid dimension."))
             return 0
-        }
+        }.getOrThrow()
 
         if (targetLevel == null) {
             source.sendFailure(Component.literal("The dimension for home '$name' is not currently available."))
             return 0
         }
 
-        try {
+        runCatching {
             val teleported = player.teleportTo(
                 targetLevel,
                 home.x,
@@ -155,7 +161,8 @@ object HomeCommands {
                 source.sendFailure(Component.literal("Minecraft rejected the teleport to home '$name'."))
                 return 0
             }
-        } catch (ex: RuntimeException) {
+        }.onFailure { ex ->
+            if (ex !is RuntimeException) throw ex
             SetHomeMod.LOGGER.error("Failed to teleport {} to home '{}'", player.getUUID(), name, ex)
             source.sendFailure(Component.literal("Failed to teleport to home '$name'."))
             return 0
@@ -166,21 +173,22 @@ object HomeCommands {
     }
 
     private fun deleteHome(source: CommandSourceStack, rawName: String): Int {
-        val player: ServerPlayer
-        try {
-            player = source.playerOrException
-        } catch (ex: Exception) {
-            source.sendFailure(Component.literal("This command can only be used by a player."))
-            return 0
-        }
+        val player: ServerPlayer = runCatching { source.playerOrException }
+            .onFailure { ex ->
+                if (ex !is Exception) throw ex
+                source.sendFailure(Component.literal("This command can only be used by a player."))
+                return 0
+            }
+            .getOrThrow()
 
         val name = normalizeHomeName(rawName)
-        try {
+        runCatching {
             if (!HomeStorageService.deleteHome(player.getUUID(), name)) {
                 source.sendFailure(Component.literal("Home '$name' not found."))
                 return 0
             }
-        } catch (ex: RuntimeException) {
+        }.onFailure { ex ->
+            if (ex !is RuntimeException) throw ex
             SetHomeMod.LOGGER.error("Failed to delete home '{}' for {}", name, player.getUUID(), ex)
             source.sendFailure(Component.literal("Failed to delete home '$name'."))
             return 0
@@ -191,13 +199,13 @@ object HomeCommands {
     }
 
     private fun listHomes(source: CommandSourceStack): Int {
-        val player: ServerPlayer
-        try {
-            player = source.playerOrException
-        } catch (ex: Exception) {
-            source.sendFailure(Component.literal("This command can only be used by a player."))
-            return 0
-        }
+        val player: ServerPlayer = runCatching { source.playerOrException }
+            .onFailure { ex ->
+                if (ex !is Exception) throw ex
+                source.sendFailure(Component.literal("This command can only be used by a player."))
+                return 0
+            }
+            .getOrThrow()
 
         val homes = HomeStorageService.getHomes(player.getUUID())
         if (homes.isEmpty()) {

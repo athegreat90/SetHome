@@ -28,7 +28,7 @@ class HomesMongoRepository(
         val client = MongoClients.create(uri)
         val database = client.getDatabase(databaseName)
 
-        try {
+        runCatching {
             database.runCommand(Document("ping", 1))
             val homesCollection = database.getCollection(collectionName)
             homesCollection.createIndex(
@@ -36,7 +36,8 @@ class HomesMongoRepository(
                 IndexOptions().unique(true)
             )
             collection = homesCollection
-        } catch (ex: RuntimeException) {
+        }.onFailure { ex ->
+            if (ex !is RuntimeException) throw ex
             client.close()
             throw IllegalStateException("Failed to connect to MongoDB at $uri", ex)
         }
@@ -49,15 +50,12 @@ class HomesMongoRepository(
         val normalizedName = normalizeHomeName(homeName)
         require(normalizedName.isNotBlank()) { "Home name cannot be blank" }
 
-        return try {
+        return runCatching {
             collection.insertOne(toDocument(playerId, normalizedName, location))
             true
-        } catch (ex: MongoWriteException) {
-            if (ex.error.category == ErrorCategory.DUPLICATE_KEY) {
-                false
-            } else {
-                throw ex
-            }
+        }.getOrElse { ex ->
+            if (ex !is MongoWriteException) throw ex
+            if (ex.error.category == ErrorCategory.DUPLICATE_KEY) false else throw ex
         }
     }
 

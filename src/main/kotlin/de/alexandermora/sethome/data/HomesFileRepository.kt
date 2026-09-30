@@ -27,7 +27,7 @@ class HomesFileRepository(configDir: Path) : HomesRepository {
         ensureFileExists()
         homes.clear()
 
-        try {
+        runCatching {
             openConfig().use { config ->
                 config.load()
 
@@ -38,12 +38,13 @@ class HomesFileRepository(configDir: Path) : HomesRepository {
                 }
 
                 for (playerEntry in playersConfig.entrySet()) {
-                    val playerId = try {
-                        UUID.fromString(playerEntry.key)
-                    } catch (ex: IllegalArgumentException) {
-                        SetHomeMod.LOGGER.warn("Skipping invalid player UUID '{}' in {}", playerEntry.key, filePath)
-                        continue
-                    }
+                    val playerId = runCatching { UUID.fromString(playerEntry.key) }
+                        .onFailure { ex ->
+                            if (ex !is IllegalArgumentException) throw ex
+                            SetHomeMod.LOGGER.warn("Skipping invalid player UUID '{}' in {}", playerEntry.key, filePath)
+                            continue
+                        }
+                        .getOrThrow()
 
                     val playerHomesConfig = playerEntry.getValue<Any?>() as? UnmodifiableConfig ?: continue
 
@@ -52,7 +53,7 @@ class HomesFileRepository(configDir: Path) : HomesRepository {
                         val homeName = normalizeHomeName(homeEntry.key)
                         val homeConfig = homeEntry.getValue<Any?>() as? UnmodifiableConfig ?: continue
 
-                        try {
+                        runCatching {
                             val dimension = requiredString(homeConfig, "dimension")
                             val x = requiredDouble(homeConfig, "x")
                             val y = requiredDouble(homeConfig, "y")
@@ -61,7 +62,8 @@ class HomesFileRepository(configDir: Path) : HomesRepository {
                             val pitch = requiredFloat(homeConfig, "pitch")
 
                             parsedHomes[homeName] = HomeLocation(dimension, x, y, z, yaw, pitch)
-                        } catch (ex: RuntimeException) {
+                        }.onFailure { ex ->
+                            if (ex !is RuntimeException) throw ex
                             SetHomeMod.LOGGER.warn("Skipping malformed home '{}' for player {}", homeName, playerId, ex)
                         }
                     }
@@ -76,7 +78,8 @@ class HomesFileRepository(configDir: Path) : HomesRepository {
                     homes.values.sumOf { it.size }, homes.size, filePath
                 )
             }
-        } catch (ex: ParsingException) {
+        }.onFailure { ex ->
+            if (ex !is ParsingException) throw ex
             backupAndResetBrokenFile(ex)
         }
     }
@@ -85,7 +88,7 @@ class HomesFileRepository(configDir: Path) : HomesRepository {
     fun save() {
         ensureFileExists()
 
-        try {
+        runCatching {
             openConfig().use { config ->
                 config.clear()
                 val playersConfig = CommentedConfig.inMemory()
@@ -110,7 +113,8 @@ class HomesFileRepository(configDir: Path) : HomesRepository {
                 config.setComment(PLAYERS_KEY, "Persistent named homes, grouped by player UUID.")
                 config.save()
             }
-        } catch (ex: RuntimeException) {
+        }.onFailure { ex ->
+            if (ex !is RuntimeException) throw ex
             throw IllegalStateException("Failed to save homes to $filePath", ex)
         }
     }
@@ -165,7 +169,7 @@ class HomesFileRepository(configDir: Path) : HomesRepository {
         homes.mapValues { HashMap(it.value) }
 
     private fun ensureFileExists() {
-        try {
+        runCatching {
             Files.createDirectories(filePath.parent)
             if (Files.notExists(filePath)) {
                 Files.writeString(
@@ -173,7 +177,8 @@ class HomesFileRepository(configDir: Path) : HomesRepository {
                     StandardOpenOption.CREATE_NEW
                 )
             }
-        } catch (ex: IOException) {
+        }.onFailure { ex ->
+            if (ex !is IOException) throw ex
             throw IllegalStateException("Failed to create homes file $filePath", ex)
         }
     }
@@ -185,7 +190,7 @@ class HomesFileRepository(configDir: Path) : HomesRepository {
             .build()
 
     private fun backupAndResetBrokenFile(cause: ParsingException) {
-        try {
+        runCatching {
             val timestamp = LocalDateTime.now().format(BACKUP_TIMESTAMP)
             val backup = filePath.resolveSibling("sethome.toml.broken-$timestamp")
             Files.copy(filePath, backup, StandardCopyOption.REPLACE_EXISTING)
@@ -195,7 +200,8 @@ class HomesFileRepository(configDir: Path) : HomesRepository {
             )
             homes.clear()
             SetHomeMod.LOGGER.error("The homes file was malformed. It was backed up to {} and reset.", backup, cause)
-        } catch (ex: IOException) {
+        }.onFailure { ex ->
+            if (ex !is IOException) throw ex
             throw IllegalStateException("Failed to back up malformed homes file $filePath", cause)
         }
     }
