@@ -24,9 +24,9 @@ instructions (mapping names licensing, "clone this template" guidance) rather th
 On Windows PowerShell, use `.\gradlew.bat` in place of `./gradlew` for every command above.
 
 `settings.gradle` applies the `org.gradle.toolchains.foojay-resolver-convention` plugin so Gradle can
-auto-provision the JDK 25 toolchain `build.gradle` requests. Don't infer the project's actual compile target from
-CI's `actions/setup-java` step — that only provisions JDK 21 to run Gradle itself, not the project toolchain (see
-the JDK 25 vs. 21 note further down).
+auto-provision the JDK 25 toolchain `build.gradle` requests, even on a machine whose system JDK is a different
+version — useful for local dev. CI (`.github/workflows/build.yml`) provisions JDK 25 directly via
+`actions/setup-java`, matching the project's toolchain requirement (see the JDK 25 note further down).
 
 There is no test suite in this repo (no `src/test` directory) and no lint task beyond normal compilation.
 `./gradlew runGameTestServer` is configured, but this repo currently defines no actual GameTests, so — like a
@@ -43,9 +43,10 @@ antivirus briefly holding a file handle, not a real problem. Run `./gradlew --st
 specific stuck subdirectory first if the retry hits the same path again; if it keeps moving to a different
 subdirectory each retry, it's faster to `rm -rf build` once and do a clean build than to chase it file by file.
 
-Note: `java.toolchain.languageVersion` in `build.gradle` is set to Java 25, but the CI workflow
-(`.github/workflows/build.yml`) provisions JDK 21. Keep this in mind if a build works locally but not in CI, or
-vice versa. The Kotlin toolchain (`kotlin { jvmToolchain(25) }`) is set to match.
+Note: `java.toolchain.languageVersion` in `build.gradle` is set to Java 25 (the latest JDK LTS release as of
+2026-09-30), and the CI workflow (`.github/workflows/build.yml`) provisions JDK 25 to match. The Kotlin toolchain
+(`kotlin { jvmToolchain(25) }`) is set to match as well. Keep all three in sync if the required Java version ever
+changes.
 
 ## Configuration
 
