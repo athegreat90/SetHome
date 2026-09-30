@@ -13,7 +13,7 @@ Commands: /sethome, /home, /homes and /delhome.
 [[dependencies.${mod_id}]]
 modId="neoforge"
 type="required"
-versionRange="[${neo_version},)"
+versionRange="${neo_version_range}"
 ordering="NONE"
 side="SERVER"
 

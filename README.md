@@ -13,11 +13,16 @@ The current source targets:
 
 | Component | Version |
 | --- | --- |
-| Minecraft | 26.1.2 |
-| NeoForge | 26.1.2.109 or a newer version compatible with Minecraft 26.1.2 |
+| Minecraft | 26.1.2 – 26.3 |
+| NeoForge | 26.1.2.109 or newer (built/verified against 26.3.0.37-beta) |
 | Java | 25 |
 
-Minecraft, NeoForge, and mod versions are defined in [gradle.properties](gradle.properties).
+Minecraft, NeoForge, and mod versions are defined in [gradle.properties](gradle.properties). NeoForge has not
+yet published a stable build for Minecraft 26.3 as of this writing, so the mod is currently built against the
+latest 26.3 beta (`26.3.0.37-beta`); re-pin `neo_version` to a stable 26.3.0.x release once NeoForge ships one.
+See `MEMORY.md` for the version-compatibility decisions behind this range, including a runtime compatibility
+shim needed for a config-registration API that NeoForge renamed between the loader used for 26.1.2/26.2 and the
+one used for 26.3.
 
 1. Set up a NeoForge server using the versions above.
 2. Obtain the SetHome JAR, or [build it from source](#development).

@@ -22,7 +22,7 @@ public final class SetHomeMod {
 
     public SetHomeMod(ModContainer modContainer) {
         modContainer.registerConfig(
-                ModConfig.Type.COMMON,
+                resolveConfigType(),
                 SetHomeConfig.SPEC,
                 Path.of(MOD_ID, "sethome-common.toml").toString()
         );
@@ -30,6 +30,17 @@ public final class SetHomeMod {
         NeoForge.EVENT_BUS.addListener(HomeCommands::register);
         NeoForge.EVENT_BUS.addListener(this::onServerStarting);
         NeoForge.EVENT_BUS.addListener(this::onServerStopping);
+    }
+
+    // FancyModLoader renamed ModConfig.Type.COMMON to LOCAL starting with loader 12.x (bundled from
+    // Minecraft 26.3 onward); loader 11.x (26.1.2/26.2) only has COMMON. Resolving by name at runtime
+    // lets one compiled jar register its config correctly across both loader generations.
+    private static ModConfig.Type resolveConfigType() {
+        try {
+            return ModConfig.Type.valueOf("LOCAL");
+        } catch (IllegalArgumentException e) {
+            return ModConfig.Type.valueOf("COMMON");
+        }
     }
 
     private void onServerStarting(ServerStartingEvent event) {
