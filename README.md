@@ -183,6 +183,14 @@ Useful development commands (use `.\gradlew.bat` instead of `./gradlew` on Windo
 | `./gradlew clean` | Remove build outputs. |
 | `./gradlew build --refresh-dependencies` | Refresh the dependency cache and rebuild. |
 
+### Publishing a release
+
+1. Bump `mod_version` in [gradle.properties](gradle.properties).
+2. Publish a GitHub Release with a tag matching that version (e.g. `3.0.0-RC1`). Mark it as a pre-release for
+   anything other than a stable release — the workflow below maps that to Modrinth's `beta` version type.
+3. [.github/workflows/publish.yml](.github/workflows/publish.yml) runs automatically, builds the mod, and uploads
+   it to Modrinth using the release's tag as the version and its release notes as the changelog.
+
 ### Resources and licensing
 
 - [NeoForge documentation](https://docs.neoforged.net/)

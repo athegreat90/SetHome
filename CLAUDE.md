@@ -21,6 +21,9 @@ repository-relative links for GitHub.
 ## Build and run commands
 
 - `./gradlew build` — compile and package the mod jar (this is what CI runs, see `.github/workflows/build.yml`)
+  on every push/PR; `.github/workflows/publish.yml` is separate — it only runs when a GitHub Release is published,
+  and publishes the built jar to Modrinth via the `Kir-Antipov/mc-publish` action (no Gradle-side plugin/config
+  needed for that — see `img/modrinth/PUBLISHING.md` and the README's "Publishing a release" section).
 - `./gradlew runClient` — launch a Minecraft client with the mod loaded
 - `./gradlew runServer` — launch a dedicated server with the mod loaded
 - `./gradlew runGameTestServer` — run the gametest server harness
