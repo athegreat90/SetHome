@@ -297,3 +297,74 @@ the Gradle Plugin Portal's metadata for `org.jetbrains.kotlin.jvm` confirming `2
 KotlinLangForge's own `README.md` on GitHub for its integration/setup instructions. The `[[dependencies]]`
 failure and the `modLoader="klf"` fix were both confirmed by actually running `./gradlew runServer`, not
 inferred from documentation alone.
+
+# try/catch → runCatching/onFailure conversion, dated 2026-09-30
+
+The user asked for every `try`/`catch` in the project to be rewritten using `runCatching`/`onFailure` instead.
+All 29 catch clauses across `SetHomeMod.kt`, `HomeCommands.kt`, `HomeStorageService.kt`, `HomeMigration.kt`,
+`HomesFileRepository.kt`, `HomesSqliteRepository.kt`, and `HomesMongoRepository.kt` were converted in one pass —
+this is now a project convention, not a partial cleanup: **new code should not reintroduce `try`/`catch`.**
+
+## `runCatching` catches `Throwable` unconditionally — every site got an explicit type guard
+
+Nearly every original catch targeted a specific type (`SQLException`, `MongoWriteException`, `ParsingException`,
+`IllegalArgumentException`, `IOException`, `ClassNotFoundException`, or at least `RuntimeException`/`Exception`
+rather than `Throwable`), letting anything else propagate and crash loudly. `runCatching`'s own catch is
+unconditionally `catch (e: Throwable)`, with no way to narrow it. Asked the user how to handle this; they chose
+to **preserve exact behavior** over shortening the code: every `onFailure`/`getOrElse` block now starts with
+`if (ex !is ExpectedType) throw ex` before doing anything else, so the set of exceptions actually handled at each
+site is byte-for-byte the same as before, and a bug that used to surface as a crash (e.g. an unexpected
+`NullPointerException`) still does, rather than getting silently absorbed as a soft "operation failed" message.
+**Any new `runCatching` call added to this codebase should follow the same pattern** — narrow with an `is` guard
+immediately, don't let it swallow `Throwable` wholesale.
+
+## `onFailure` can't produce a value — three sites use `getOrElse` instead
+
+`onFailure`'s lambda returns `Unit`; it can inspect/act on the failure but can't change what the `Result` holds.
+That's fine for catches that only ever transfer control (return/continue/throw), but three sites in this
+codebase genuinely *recover to a different value* rather than transferring control, and structurally cannot use
+`onFailure` at all:
+- `SetHomeMod.resolveConfigType()` — falls back to `ModConfig.Type.valueOf("COMMON")`.
+- `HomesMongoRepository.setHome()` — a duplicate-key `MongoWriteException` becomes `false` (not a rethrow).
+- `HomeStorageService.initialize()` — a failed DB-backend `load()` falls back to a `HomesFileRepository`.
+
+These three use `getOrElse { ex -> if (ex !is X) throw ex; <value or throw> }` directly, with no separate
+`onFailure` step (chaining both would be redundant since `getOrElse`'s lambda already receives the exception).
+**If a future catch needs to compute a replacement value on failure, reach for `getOrElse` (or `recover`), not
+`onFailure` — `onFailure` alone will not compile in that shape without an extra unwrap step, and even then can't
+express "produce this value instead."**
+
+## Non-local `return`/`continue` inside a `runCatching { }` block is safe, because the whole chain is `inline`
+
+Several sites had a `return` or `continue` sitting *inside* the risky code itself, not just in the catch (e.g.
+`HomesFileRepository.load()`'s "no persisted homes found" early `return`, buried inside `runCatching { ... }`
+after conversion). This is safe specifically because `runCatching`, `onFailure`, `getOrElse`, and `kotlin.io.use`
+are all `inline` functions: after inlining, a `return`/`continue` in their lambda arguments compiles to a normal
+JVM return/loop-jump instruction physically inside the calling function, which is unaffected by any `catch`
+clause (catch clauses only intercept *thrown* exceptions, never `return`/`continue`/`break` control flow) — it
+does **not** get intercepted by `runCatching`'s own internal `catch (e: Throwable)` and turned into a `Result`.
+This was reasoned through carefully rather than assumed, then verified empirically by actually running the
+converted `HomesFileRepository.load()` against a malformed `sethome.toml` — see the next section. **This safety
+holds only as long as every function in the chain between the `return`/`continue` and its target loop/function is
+itself `inline`** (true for all of `runCatching`/`onFailure`/`getOrElse`/`use`) — don't assume the same is safe
+inside a non-inline lambda (e.g. a regular `Runnable`, or a lambda stored in a `val`).
+
+## Multi-catch on one `try` becomes a single `onFailure` with a `when`
+
+`HomeCommands.setHome()` had two catch clauses on the same `try` (`IllegalStateException` handled one way,
+`RuntimeException` another). `onFailure` only takes one lambda, so this became a `when (ex) { is
+IllegalStateException -> {...}; is RuntimeException -> {...}; else -> throw ex }` — checked in the same
+specific-to-general order the original catch clauses were, since `IllegalStateException` is itself a
+`RuntimeException` and order matters. This is the pattern to reuse for any other multi-catch that comes up.
+
+## Verified by running the actual dev server, not just by compiling
+
+The build succeeded on the first attempt for all 29 conversions, but that only proves the code compiles, not
+that it behaves the same. Verified two runtime paths directly: normal startup (confirms the `HomesFileRepository`
+"no persisted homes found" early-return-inside-`runCatching` path executes correctly), and — the trickiest
+conversion — feeding `HomesFileRepository` a deliberately malformed `sethome.toml` and confirming it still logs
+"The homes file was malformed... backed up... and reset" and starts normally, rather than crashing. This
+specifically exercises the *intentional-swallow* `onFailure` sites (`ParsingException` here, also
+`HomesSqliteRepository.close()`'s log-only `SQLException` handler) where no `.getOrThrow()`/rethrow follows the
+`onFailure` block — getting that wrong (e.g. accidentally adding a trailing `.getOrThrow()` after an
+intentionally-swallowing `onFailure`) would turn a graceful recovery into a crash.
