@@ -368,3 +368,45 @@ specifically exercises the *intentional-swallow* `onFailure` sites (`ParsingExce
 `HomesSqliteRepository.close()`'s log-only `SQLException` handler) where no `.getOrThrow()`/rethrow follows the
 `onFailure` block — getting that wrong (e.g. accidentally adding a trailing `.getOrThrow()` after an
 intentionally-swallowing `onFailure`) would turn a graceful recovery into a crash.
+
+# Post-Kotlin-migration Minecraft 26.1.2–26.3 re-verification, and branch/CI cleanup, dated 2026-09-30
+
+The Kotlin migration and KotlinLangForge (KLF) switch above were each verified against Minecraft **26.3** only
+(the branch's default compile/run target). `gradle.properties` still *declares* `minecraft_version_range=
+[26.1.2,26.4)` / `neo_version_range=[26.1.2.109,)`, covering the full 26.1.2–26.3 range, but that range had never
+been re-tested end-to-end against the Kotlin+KLF-based mod — only the old Java+KFF/KLF-per-version history had
+been. This mattered because this project has direct precedent for a declared range being wrong in practice: KFF
+declared Minecraft support that didn't actually include 26.3 (see the KFF section above), and
+`SetHomeMod.resolveConfigType()` exists because FancyModLoader silently renamed an API between the loader
+generations spanning this exact range.
+
+Before deleting the old single-version-pinned `minecraft-26.1.2` branch (which still held a known-working Java
+build as an implicit fallback), the full range was re-verified empirically on the `26` branch (Kotlin + KLF):
+
+- **Floor**: `./gradlew runServer -Pneo_version=26.1.2.109 -Pminecraft_version=26.1.2` — booted cleanly, KLF
+  loaded `sethome` via its `klf` language loader with no dependency-version errors, `SetHomeMod`'s config/storage
+  init logged correctly ("Loaded 1 home(s) for 1 player(s)..."), server reached `Done`.
+- **Midpoint**: same override pattern with `-Pneo_version=26.2.0.88 -Pminecraft_version=26.2` — same clean result.
+- **Upper end** (`26.3.0.37-beta`): already the branch's default target, already verified end-to-end when KLF was
+  integrated (see the "KotlinLangForge switch" section above) — not re-run.
+
+This was also cross-checked against KLF's own declared Minecraft support, fetched live from the Modrinth API for
+the exact pinned version (`2.14.1-k2.4.20-3.1+neoforge`): `game_versions` =
+`["1.21.9","1.21.10","1.21.11","26.1","26.1.1","26.1.2","26.2","26.3"]` — the full range this mod declares is
+covered, unlike KFF's declared range, which excluded 26.3 outright.
+
+**Result: the 26.1.2–26.3 range is now confirmed to actually work post-Kotlin-migration, not just declared.**
+`minecraft-26.1.2` was then deleted (both locally and on the remote; the repo's GitHub default branch was switched
+from `minecraft-26.1.2` to `26` first, since GitHub refuses to delete a repo's default branch) — it was a strict
+ancestor of `26` with no unique commits, no branch protection, and no PRs ever targeting it, so nothing was lost.
+
+## CI JDK bumped from 21 to 25 in the same pass
+
+`.github/workflows/build.yml` had provisioned JDK 21 since before this migration, while `build.gradle` has
+required Java 25 the whole time (`java.toolchain.languageVersion`, `kotlin.jvmToolchain`) — CI only worked because
+`settings.gradle`'s Foojay toolchain resolver let Gradle auto-download JDK 25 regardless of what `setup-java`
+provisioned to run Gradle itself. Checked live via Adoptium's release-info API
+(`https://api.adoptium.net/v3/info/available_releases`): `available_lts_releases` = `8, 11, 17, 21, 25`,
+`most_recent_lts` = `25` — so bumping CI's `actions/setup-java` to `java-version: '25'` is simultaneously "the
+latest JDK LTS" and "what the mod already requires," collapsing what used to be a documented CI/local mismatch.
+Verified green on GitHub Actions after the push (`gh run watch`), not just locally.

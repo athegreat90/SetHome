@@ -7,8 +7,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 SetHome is a server-side NeoForge mod for Minecraft that lets players save, teleport to, list, and delete
 named home locations. It exposes four commands: `/sethome <name>`, `/home <name>`, `/homes`, `/delhome <name>`.
 
-This repo was bootstrapped from the NeoForge MDK template — `README.md` still contains the generic MDK/template
-instructions (mapping names licensing, "clone this template" guidance) rather than project-specific docs.
+This repo was bootstrapped from the NeoForge MDK template, but `README.md` has since been fully rewritten into
+project-specific docs (requirements/installation, commands, configuration, storage-backend setup, migration,
+development) — it's user-facing documentation, not a template scaffold, so keep it in sync with real behavior the
+same way this file is kept in sync. `TEMPLATE_LICENSE.txt` is the one genuine template leftover still in the repo:
+it's the MIT license covering the *template files themselves* (from `github.com/NeoForged/MDK`), separate from
+SetHome's own "All Rights Reserved" license declared in `gradle.properties`/`neoforge.mods.toml` — this is
+intentional, not stale content to clean up. `img/modrinth/` holds the project icon and gallery screenshots for
+publishing to Modrinth, plus `img/modrinth/PUBLISHING.md` explaining upload order/captions (named to avoid a
+second file called `README.md` in the repo); the root `README.md`'s Screenshots section embeds the same PNGs via
+repository-relative links for GitHub.
 
 ## Build and run commands
 
