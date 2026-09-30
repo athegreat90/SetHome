@@ -124,6 +124,9 @@ Package root: `de.alexandermora.sethome`, all Kotlin under `src/main/kotlin/`.
   normalization itself (`normalizeDimension`) accepts both the modern `minecraft:overworld`-style identifier and
   the legacy `ResourceKey[minecraft:dimension / minecraft:overworld]` string form — needed because dimension
   identifiers have been persisted in both forms across versions.
+- `data/HomesRepository` — the storage-backend interface (`load`/`setHome`/`getHome`/`getHomes`/`deleteHome`/
+  `countHomes`/`close`) implemented by `HomesFileRepository`, `HomesSqliteRepository`, and `HomesMongoRepository`.
+  `setHome` returning `false` means "a home with this name already exists for this player", not an error.
 - `data/HomeStorageService` — a Kotlin `object` (singleton facade) used by the command layer. Enforces
   `maxHomesPerPlayer` from `SetHomeConfig` before delegating to the active repository, and must be
   `initialize()`d (from `ServerStartingEvent`) before use, else `repository()` throws `NullPointerException`.
@@ -141,6 +144,11 @@ Package root: `de.alexandermora.sethome`, all Kotlin under `src/main/kotlin/`.
   (assigned in `load()`) rather than a nullable field, so using either repository before `load()` throws
   `UninitializedPropertyAccessException` — the same "must be loaded first" contract `HomesFileRepository` gets for
   free from `HomeStorageService` always calling `load()` right after construction.
+  `HomesSqliteRepository`'s companion `init` block explicitly `Class.forName("org.sqlite.JDBC")`s before any use,
+  since the `jarJar`-shaded driver's service-loader registration has occasionally failed to auto-register itself —
+  don't remove this as dead code. `HomesMongoRepository.load()` creates a unique index on `(playerId, homeName)`,
+  which is what turns a duplicate `setHome` into a caught `MongoWriteException` (see Error handling convention
+  below) rather than a silent overwrite.
 - `data/HomeMigration` — an `internal object` (Kotlin's closest equivalent to Java package-private) with the
   `migrate(source, target)` one-way copy from `HomesFileRepository.exportAll()` into another backend.
 - `config/StorageMode` — `enum class StorageMode { FILE, MONGODB, SQLITE }`, the single source of truth for
