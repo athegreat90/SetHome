@@ -3,6 +3,10 @@ plugins {
     id 'maven-publish'
     id 'net.neoforged.moddev' version '2.0.148'
     id 'idea'
+    // Pinned to match the Kotlin version bundled by kotlinlangforge_version in gradle.properties
+    // (KotlinLangForge 2.14.1-k2.4.20-3.1+neoforge bundles Kotlin 2.4.20) - the plugins {} block only accepts
+    // literal version strings, so this can't reference that property directly; keep the two in sync by hand.
+    id 'org.jetbrains.kotlin.jvm' version '2.4.20'
 }
 
 tasks.named('wrapper', Wrapper).configure {
@@ -20,6 +24,11 @@ sourceSets.main.resources {
 
 repositories {
     mavenCentral()
+    // KotlinLangForge is not published to Maven Central.
+    maven {
+        name = 'nyon'
+        url = 'https://repo.nyon.dev/releases'
+    }
 }
 
 def mongoDriverVersion = '5.8.0'
@@ -52,6 +61,13 @@ dependencies {
             prefer sqliteDriverVersion
         }
     }
+
+    // KotlinLangForge provides the Kotlin runtime (stdlib/reflect/coroutines/serialization, shaded into its
+    // own jar) that this mod's Kotlin-compiled classes need at runtime, so it's required on the server - see
+    // the "klf" entry in neoforge.mods.toml. Declared as a plain (not jarJar) dependency: it stays off the
+    // packaged mod jar (only jarJar-wrapped dependencies get embedded), while ModDevGradle still picks it up
+    // as an installed mod for runClient/runServer/runGameTestServer dev runs.
+    implementation("dev.nyon:KotlinLangForge:${kotlinlangforge_version}")
 }
 
 base {
@@ -59,6 +75,10 @@ base {
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+kotlin {
+    jvmToolchain(25)
+}
 
 neoForge {
     version = project.neo_version

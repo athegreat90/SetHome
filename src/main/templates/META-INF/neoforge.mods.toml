@@ -1,3 +1,11 @@
+# This mod's source is Kotlin; it uses KotlinLangForge's own "klf" language loader (rather than the default
+# javafml) to load - KLF's mods.toml dependency version (its full "<modVersion>-k<kotlin>-<lp>+<loader>"
+# string) is not reliably parseable as a plain Maven version range by FML's normal [[dependencies]] mechanism
+# (confirmed by testing: FML reports the installed version as "[MISSING]" even when it matches exactly), so
+# the language-loader's own small loaderVersion ("3.1"-style language-provider version) is used instead to
+# gate compatibility, per KotlinLangForge's own integration instructions.
+modLoader="klf"
+loaderVersion="[1,)"
 license="${mod_license}"
 
 [[mods]]
