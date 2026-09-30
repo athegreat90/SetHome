@@ -21,7 +21,16 @@ instructions (mapping names licensing, "clone this template" guidance) rather th
 - `./gradlew clean` — reset build outputs without touching source
 - `./gradlew --refresh-dependencies` — refresh the local dependency cache if the IDE reports missing libraries
 
+On Windows PowerShell, use `.\gradlew.bat` in place of `./gradlew` for every command above.
+
+`settings.gradle` applies the `org.gradle.toolchains.foojay-resolver-convention` plugin so Gradle can
+auto-provision the JDK 25 toolchain `build.gradle` requests. Don't infer the project's actual compile target from
+CI's `actions/setup-java` step — that only provisions JDK 21 to run Gradle itself, not the project toolchain (see
+the JDK 25 vs. 21 note further down).
+
 There is no test suite in this repo (no `src/test` directory) and no lint task beyond normal compilation.
+`./gradlew runGameTestServer` is configured, but this repo currently defines no actual GameTests, so — like a
+successful `build` — a successful run there doesn't verify mod loading or behavior either.
 
 The mod's source is 100% Kotlin (`src/main/kotlin/`, no `src/main/java/` directory exists — `compileJava`
 legitimately runs as `NO-SOURCE`). `compileKotlin` is the task that actually compiles the mod.
@@ -78,6 +87,12 @@ vice versa. The Kotlin toolchain (`kotlin { jvmToolchain(25) }`) is set to match
   bundles; bump both together, never independently, and re-check KLF's Minecraft/NeoForge support range on each
   bump. This replaced an earlier dependency on "Kotlin for Forge" (KFF, `thedarkcolour`), which didn't support
   this project's `minecraft_version=26.3` pin — see `MEMORY.md` for that history and the full KLF investigation.
+  KLF is declared as a plain `implementation` dependency rather than `jarJar`: this keeps it off the packaged mod
+  jar (only `jarJar`-wrapped dependencies get embedded) while still letting ModDevGradle's dev runs
+  (`runClient`/`runServer`/`runGameTestServer`) pick it up as an installed mod.
+- `jarJar` does not embed a dependency's transitive dependencies automatically. `build.gradle` explicitly `jarJar`s
+  `mongodb-driver-sync`'s transitive `mongodb-driver-core` and `bson` (and `sqlite-jdbc`) as their own separate
+  entries for this reason — keep this in mind when changing or adding a `jarJar`-bundled dependency.
 
 ## Architecture
 
@@ -90,7 +105,9 @@ Package root: `de.alexandermora.sethome`, all Kotlin under `src/main/kotlin/`.
   `MOD_ID`/`LOGGER`/`resolveConfigType()` live on its `companion object`. Its
   `init` block registers the config spec, registers `HomeCommands::register` and this-bound `::onServerStarting`/
   `::onServerStopping` references on the event bus, and initializes/shuts down `HomeStorageService` (data
-  directory is `config/sethome/`). This mod is server-side only (see `side="SERVER"` in `neoforge.mods.toml`).
+  directory is `config/sethome/`, resolved via `Path.of("config", MOD_ID)` — relative to the server's working
+  directory, not the world save directory). This mod is server-side only (see `side="SERVER"` in
+  `neoforge.mods.toml`).
 - `command/HomeCommands` — a Kotlin `object` (singleton) holding Brigadier command registration and handlers for
   `/sethome`, `/home`, `/homes`, `/delhome`. All player-facing validation and error messaging lives here; handlers
   catch exceptions from the storage layer and translate them into `sendFailure` messages rather than letting them
@@ -112,6 +129,10 @@ Package root: `de.alexandermora.sethome`, all Kotlin under `src/main/kotlin/`.
   `initialize()`d (from `ServerStartingEvent`) before use, else `repository()` throws `NullPointerException`.
   Selects and constructs the configured backend (`createDbRepository`, a `when` over `StorageMode`), falls back to
   `FILE` if the configured backend fails to `load()`, and runs `HomeMigration` when `migrateFromFile` is enabled.
+  Migration re-runs on every server startup while `migrateFromFile` stays enabled (it is not one-time), only skips
+  homes already present *in the target* repository — so the source file is never touched/consumed, meaning a home
+  deleted from the DB target reappears on the next startup — and migrates via the repository directly, bypassing
+  `HomeStorageService.setHome`'s `maxHomesPerPlayer` enforcement.
 - `data/HomesFileRepository` — the default repository. Persists homes as TOML (via NightConfig) at
   `config/sethome/sethome.toml`, keyed by player UUID then home name. On a parse failure it backs up the broken
   file (`sethome.toml.broken-<timestamp>`) and resets to an empty file rather than crashing startup.
@@ -134,3 +155,21 @@ command layer assume single-threaded-per-call access to the in-memory/connection
 All home names and player-facing identifiers are lowercased/trimmed via a private `normalizeHomeName` helper that
 is duplicated in `HomeCommands`, `HomesFileRepository`, `HomesSqliteRepository`, and `HomesMongoRepository` — keep
 all four in sync if that logic changes.
+
+## Error handling convention
+
+This codebase uses `runCatching`/`onFailure` instead of `try`/`catch` throughout — an established repo-wide
+convention (see `MEMORY.md`'s "try/catch → runCatching/onFailure conversion" for the full rationale and history),
+not a partial cleanup. New code should not reintroduce `try`/`catch`.
+
+- `runCatching`'s own catch is unconditionally `catch (e: Throwable)`, with no way to narrow it directly. Every
+  `onFailure`/`getOrElse` site must immediately guard with `if (ex !is ExpectedType) throw ex` before doing
+  anything else, so unrelated exceptions still propagate instead of being silently absorbed. What used to be a
+  multi-catch `try` becomes a single `onFailure`/`getOrElse` with an ordered `when (ex) { is Specific -> ...; is
+  General -> ...; else -> throw ex }` — most-specific type first, matching the original catch-clause order.
+- Use `getOrElse` (not `onFailure`) when the recovery path must produce a replacement value — `onFailure`'s lambda
+  always returns `Unit` and can't change what the `Result` holds. Examples: `SetHomeMod.resolveConfigType()`'s
+  `COMMON`/`LOCAL` fallback, `HomeStorageService.initialize()`'s DB-to-FILE fallback.
+- Some `onFailure` blocks are an intentional silent recovery with no following `getOrThrow()`/rethrow — e.g.
+  `HomesFileRepository`'s malformed-file backup-and-reset, `HomesSqliteRepository.close()`'s log-only handler.
+  Don't append a trailing `getOrThrow()` to these; that would turn a graceful recovery into a crash.
