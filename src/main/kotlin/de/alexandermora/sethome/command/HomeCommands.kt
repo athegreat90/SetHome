@@ -13,9 +13,8 @@ import net.minecraft.resources.Identifier
 import net.minecraft.resources.ResourceKey
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.level.Level
 import net.neoforged.neoforge.event.RegisterCommandsEvent
-import java.util.Locale
+import java.util.*
 
 object HomeCommands {
 
@@ -59,13 +58,7 @@ object HomeCommands {
     }
 
     private fun setHome(source: CommandSourceStack, rawName: String): Int {
-        val player: ServerPlayer = runCatching { source.playerOrException }
-            .onFailure { ex ->
-                if (ex !is Exception) throw ex
-                source.sendFailure(Component.literal("This command can only be used by a player."))
-                return 0
-            }
-            .getOrThrow()
+        val player = requirePlayer(source) ?: return 0
 
         val name = normalizeHomeName(rawName)
         if (name.isBlank()) {
@@ -75,12 +68,12 @@ object HomeCommands {
 
         val level: ServerLevel = player.level()
         val location = HomeLocation(
-            level.dimension().identifier().toString(),
-            player.x,
-            player.y,
-            player.z,
-            player.getYRot(),
-            player.getXRot()
+            dimension = level.dimension().identifier().toString(),
+            x = player.x,
+            y = player.y,
+            z = player.z,
+            yaw = player.yRot,
+            pitch = player.xRot
         )
 
         runCatching {
@@ -111,13 +104,7 @@ object HomeCommands {
     }
 
     private fun teleportHome(source: CommandSourceStack, rawName: String): Int {
-        val player: ServerPlayer = runCatching { source.playerOrException }
-            .onFailure { ex ->
-                if (ex !is Exception) throw ex
-                source.sendFailure(Component.literal("This command can only be used by a player."))
-                return 0
-            }
-            .getOrThrow()
+        val player = requirePlayer(source) ?: return 0
 
         val name = normalizeHomeName(rawName)
         val home = HomeStorageService.getHome(player.getUUID(), name)
@@ -173,13 +160,7 @@ object HomeCommands {
     }
 
     private fun deleteHome(source: CommandSourceStack, rawName: String): Int {
-        val player: ServerPlayer = runCatching { source.playerOrException }
-            .onFailure { ex ->
-                if (ex !is Exception) throw ex
-                source.sendFailure(Component.literal("This command can only be used by a player."))
-                return 0
-            }
-            .getOrThrow()
+        val player = requirePlayer(source) ?: return 0
 
         val name = normalizeHomeName(rawName)
         runCatching {
@@ -199,13 +180,7 @@ object HomeCommands {
     }
 
     private fun listHomes(source: CommandSourceStack): Int {
-        val player: ServerPlayer = runCatching { source.playerOrException }
-            .onFailure { ex ->
-                if (ex !is Exception) throw ex
-                source.sendFailure(Component.literal("This command can only be used by a player."))
-                return 0
-            }
-            .getOrThrow()
+        val player = requirePlayer(source) ?: return 0
 
         val homes = HomeStorageService.getHomes(player.getUUID())
         if (homes.isEmpty()) {
@@ -218,4 +193,14 @@ object HomeCommands {
     }
 
     private fun normalizeHomeName(input: String?): String = input?.trim()?.lowercase(Locale.ROOT) ?: ""
+
+    private fun requirePlayer(source: CommandSourceStack): ServerPlayer? {
+        val player = runCatching { source.playerOrException }
+            .onFailure { ex -> if (ex !is Exception) throw ex }
+            .getOrNull()
+        if (player == null) {
+            source.sendFailure(Component.literal("This command can only be used by a player."))
+        }
+        return player
+    }
 }
