@@ -15,6 +15,7 @@ The current source targets:
 | --- | --- |
 | Minecraft | 26.1.2 – 26.3 |
 | NeoForge | 26.1.2.109 or newer (built/verified against 26.3.0.37-beta) |
+| KotlinLangForge | 2.14.1-k2.4.20-3.1+neoforge or newer |
 | Java | 25 |
 
 Minecraft, NeoForge, and mod versions are defined in [gradle.properties](gradle.properties). NeoForge has not
@@ -24,13 +25,20 @@ See `MEMORY.md` for the version-compatibility decisions behind this range, inclu
 shim needed for a config-registration API that NeoForge renamed between the loader used for 26.1.2/26.2 and the
 one used for 26.3.
 
-1. Set up a NeoForge server using the versions above.
-2. Obtain the SetHome JAR, or [build it from source](#development).
-3. Place the mod JAR in the server's `mods/` directory.
-4. Start the server to generate `config/sethome/sethome-common.toml` and initialize home storage.
-5. Join the server and save your first home with `/sethome base`.
+The mod's source is Kotlin, so the server also needs
+[KotlinLangForge](https://modrinth.com/mod/kotlin-lang-forge) installed alongside SetHome to supply the Kotlin
+runtime — SetHome loads via KotlinLangForge's own `klf` language loader (see `neoforge.mods.toml`), which covers
+Minecraft 26.1.2 through 26.3 as of KotlinLangForge `2.14.1-k2.4.20-3.1+neoforge`.
 
-Players can use the commands without installing SetHome on their clients.
+1. Set up a NeoForge server using the versions above.
+2. Install [KotlinLangForge](https://modrinth.com/mod/kotlin-lang-forge) (`2.14.1-k2.4.20-3.1+neoforge`+) in the
+   server's `mods/` directory alongside SetHome.
+3. Obtain the SetHome JAR, or [build it from source](#development).
+4. Place the mod JAR in the server's `mods/` directory.
+5. Start the server to generate `config/sethome/sethome-common.toml` and initialize home storage.
+6. Join the server and save your first home with `/sethome base`.
+
+Players can use the commands without installing SetHome (or KotlinLangForge) on their clients.
 
 ## Commands
 
