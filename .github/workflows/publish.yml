@@ -29,8 +29,7 @@ jobs:
       - name: Publish to Modrinth
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          # TODO: replace with this project's own Modrinth project ID/slug once created (see img/modrinth/PUBLISHING.md).
-          modrinth-id: REPLACE_WITH_MODRINTH_PROJECT_ID
+          modrinth-id: HhUmEUqn
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
           files: build/libs/*.jar
           name: ${{ github.event.release.name }}
