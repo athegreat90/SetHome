@@ -66,7 +66,10 @@ class GitHub:
     def api(self, endpoint):
         result = subprocess.run(["gh", "api", endpoint], capture_output=True, text=True)
         if result.returncode:
-            if "HTTP 404" in result.stderr:
+            # The commits endpoint answers 422 (not 404) when a ref such as a new tag does not exist yet.
+            if "HTTP 404" in result.stderr or (
+                "HTTP 422" in result.stderr and "No commit found for SHA" in result.stderr
+            ):
                 return None
             raise RuntimeError(f"GitHub API failed for {endpoint}: {result.stderr}")
         return json.loads(result.stdout)

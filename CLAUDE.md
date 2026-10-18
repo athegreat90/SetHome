@@ -21,7 +21,7 @@ repository-relative links for GitHub.
 ## Build and run commands
 
 - `./gradlew build` — compile and package the mod jar (this is what CI runs, see `.github/workflows/build.yml`)
-  on every push/PR. `.github/workflows/release.yml` creates a stable release only when a push to branch `26`
+  on every push/PR. `.github/workflows/release.yml` creates a stable release only when a push to branch `main`
   changes `mod_version` to a stable SemVer, after building the exact commit. It explicitly calls reusable
   `.github/workflows/publish.yml` because `GITHUB_TOKEN`-created releases do not trigger release-event workflows.
   Manual GitHub Releases still trigger publishing; tools and released sources use separate exact-revision

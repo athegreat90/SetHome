@@ -216,13 +216,13 @@ compatibility range, repeat packaged-JAR loading and storage checks on Minecraft
 
 ### Publishing a release
 
-**A version-changing push to branch `26` publishes automatically.** Finish compatibility and hands-on
+**A version-changing push to branch `main` publishes automatically.** Finish compatibility and hands-on
 qualification before deliberately pushing a stable version change; implementing this workflow does not authorize
 a push or a live release.
 
 1. Qualify the candidate, then change `mod_version` in [gradle.properties](gradle.properties) to a stable SemVer
    such as `3.0.1`.
-2. When authorized, push to the exact branch `26`.
+2. When authorized, push to the exact branch `main`.
    [.github/workflows/release.yml](.github/workflows/release.yml) compares the parsed version before and after
    the push. Unchanged versions, prereleases and initial branch-creation pushes do not publish; invalid versions
    fail validation.

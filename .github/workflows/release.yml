@@ -2,7 +2,7 @@ name: Release stable version
 
 on:
   push:
-    branches: ['26']
+    branches: ['main']
 
 permissions:
   contents: read
