@@ -241,7 +241,7 @@ and other versions do not share a pending-publication lock. Manual tag builds us
 the executing workflow's helper checkout, so legacy tags need not contain the helper.
 Rerun a failed workflow to recover a missing
 upload: matching GitHub releases/assets and matching Modrinth versions are reused, not overwritten or uploaded
-twice. A tag pointing elsewhere or an existing artifact/metadata mismatch fails explicitly; investigate rather
+twice. While the Modrinth project is a draft or under review its versions are hidden (HTTP 404), so the existing-version check treats that as "none visible" and Modrinth's own duplicate-version rejection applies. A tag pointing elsewhere or an existing artifact/metadata mismatch fails explicitly; investigate rather
 than moving a released tag. No live Actions or Modrinth publication is verified by the offline tests.
 
 ### Resources and licensing

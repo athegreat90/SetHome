@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import unittest
+from urllib.error import HTTPError
 import uuid
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -322,6 +323,21 @@ class CommandTests(unittest.TestCase):
             self.assertIn("/project/HhUmEUqn/version", request.full_url)
         with patch.dict(release.os.environ, {}, clear=True):
             self.assertIsNone(release.modrinth_versions_request("owner/repo").get_header("Authorization"))
+
+    def test_modrinth_versions_treat_only_404_as_no_visible_versions(self):
+        with patch.object(release, "urlopen",
+                          side_effect=HTTPError("url", 404, "Not Found", {}, None)):
+            self.assertEqual(release.modrinth_versions("owner/repo"), [])
+        for code in [401, 500]:
+            with self.subTest(code=code), patch.object(
+                    release, "urlopen", side_effect=HTTPError("url", code, "Error", {}, None)):
+                with self.assertRaises(HTTPError):
+                    release.modrinth_versions("owner/repo")
+        response = Mock()
+        response.__enter__ = Mock(return_value=io.StringIO('[{"version_number": "1"}]'))
+        response.__exit__ = Mock(return_value=False)
+        with patch.object(release, "urlopen", return_value=response):
+            self.assertEqual(release.modrinth_versions("owner/repo"), [{"version_number": "1"}])
 
     def test_manual_stable_and_prerelease_metadata_and_repeated_publication(self):
         for prerelease in [False, True]:
