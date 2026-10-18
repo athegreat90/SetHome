@@ -315,6 +315,14 @@ class CommandTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 gh.api("endpoint")
 
+    def test_modrinth_version_request_authenticates_only_with_a_token(self):
+        with patch.dict(release.os.environ, {"MODRINTH_TOKEN": "secret"}):
+            request = release.modrinth_versions_request("owner/repo")
+            self.assertEqual(request.get_header("Authorization"), "secret")
+            self.assertIn("/project/HhUmEUqn/version", request.full_url)
+        with patch.dict(release.os.environ, {}, clear=True):
+            self.assertIsNone(release.modrinth_versions_request("owner/repo").get_header("Authorization"))
+
     def test_manual_stable_and_prerelease_metadata_and_repeated_publication(self):
         for prerelease in [False, True]:
             for repeated in [False, True]:
