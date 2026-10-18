@@ -410,3 +410,100 @@ provisioned to run Gradle itself. Checked live via Adoptium's release-info API
 `most_recent_lts` = `25` — so bumping CI's `actions/setup-java` to `java-version: '25'` is simultaneously "the
 latest JDK LTS" and "what the mod already requires," collapsing what used to be a documented CI/local mismatch.
 Verified green on GitHub Actions after the push (`gh run watch`), not just locally.
+
+# Stable NeoForge 26.3, dependency upgrades, release automation and Gradle 9.8.1, dated 2026-10-18
+
+Work landed in two branches: `feat/stable-26.3` (PR #2 into `26`, commits `134548c`, `c72589f`, `5ceff7e`) and a
+follow-up `chore/deps-3.0.1` (commit `512c34b`, based on the PR head and not yet merged). Merging either into
+`26` is a separate human decision, and a version-changing push to `26` now publishes automatically (see below).
+
+## Stable NeoForge 26.3 and dependency pins
+
+- `neo_version` moved from `26.3.0.37-beta` to stable `26.3.0.92`. `neo_version_range=[26.1.2.109,)` and
+  `minecraft_version_range=[26.1.2,26.4)` are deliberately unchanged, so the compile target moved without raising
+  the runtime floor (see the `neo_version` / `neo_version_range` section above).
+- Kotlin Gradle plugin `2.4.20` → `2.4.21` together with KotlinLangForge `2.14.1-k2.4.20-3.1+neoforge` →
+  `2.15.0-k2.4.21-3.1+neoforge`. They move as a pair because KLF bundles the Kotlin runtime. KLF's Modrinth
+  metadata lists 26.1.2, 26.2 and 26.3.
+- MongoDB sync/core/BSON `5.8.0` → `5.13.0` (jarJar interval `[5.13,5.14)`) and sqlite-jdbc `3.49.1.0` →
+  `3.53.4.0` (interval `[3.53.4.0,3.54)`). The three MongoDB artifacts stay explicit jarJar entries because
+  jarJar does not embed transitive dependencies. The packaged jar's embedded metadata was inspected directly:
+  an earlier build-worker report of old embedded versions was contradicted by the actual ZIP entries.
+- Kotlin plugin, ModDevGradle `2.0.148` and the Foojay resolver `1.0.0` were already the newest stable versions
+  at the time, so they were not changed. Maven `latest`/`release` for Kotlin pointed at a beta, so stable
+  versions must be selected by inspecting qualifiers, not by trusting those fields.
+- `mod_version`: `3.0.0-RC1` → `3.0.0` (stable, qualified) → `3.0.1` (build/CI maintenance, no gameplay change).
+
+## Gradle wrapper: 9.2.1 → 9.7.0 → 9.8.1
+
+The wrapper first moved to 9.7.0 (Kotlin 2.4.21's documented maximum) and was then deliberately taken to the
+latest stable **9.8.1** on the user's explicit choice, accepting a known compatibility gap: Kotlin's published
+compatibility table fully supports Gradle only through 9.7.0, and ModDevGradle only enforces a *minimum* Gradle
+(8.8), so neither documents 9.8.1. This is local qualification, not upstream support. The wrapper pins the
+distribution SHA-256 (`dce76f55…c01f`); the regenerated wrapper JAR's SHA-256 (`3b8a2577…8e98`) matched Gradle's
+published value. The wrapper was regenerated with `gradlew wrapper --gradle-version ... --gradle-distribution-sha256-sum ...`
+run twice (once to update the properties, once under the new wrapper so all launcher files are regenerated);
+`gradlew.bat` changes (safety-net padding, `goto exitWithErrorLevel`) are generated output, not hand edits.
+Qualification covered forced compilation and `build`, `prepareClientRun`/`prepareServerRun` with `--warning-mode all`,
+and a packaged-jar server start. If Gradle is bumped again, repeat these and re-check Kotlin's table first.
+
+## Release automation (`.github/workflows/release.yml`, `publish.yml`, `.github/scripts/release.py`)
+
+- A push to branch `26` whose parsed `mod_version` changed to a stable SemVer builds the exact commit, creates a
+  tag named exactly the version (no `v` prefix) and a GitHub Release with the packaged jar, then publishes the same
+  jar to Modrinth. Unchanged versions, prereleases, comment-only edits and initial branch-creation pushes do not
+  publish; malformed versions fail the gate.
+- `release.yml` calls `publish.yml` explicitly through `workflow_call` because releases created with
+  `GITHUB_TOKEN` do not trigger release-event workflows. Manual GitHub Releases still publish via the
+  `release: published` trigger. Only `create-release` has `contents: write`; locks are version-scoped
+  (`sethome-release-<version>`, `sethome-modrinth-<version>`), never workflow-wide, so unrelated pushes don't
+  queue behind a pending publication.
+- Publishing checks out the executing workflow's helper (`github.workflow_sha`, path `tools`) separately from the
+  release source (path `source`), so legacy tags without the helper still publish. Reruns reuse a matching GitHub
+  asset and matching Modrinth version (SHA-512, loaders, game versions, version type) instead of duplicating.
+  A tag pointing elsewhere or an artifact/metadata mismatch fails explicitly; never move a released tag.
+- Offline Python `unittest` coverage runs on every push/PR (`python -m unittest discover -s .github/scripts/tests`):
+  33 tests at the stable release, 35 after the Actions pin assertions. No live Actions run or Modrinth upload has been
+  performed; that remains the main unverified area.
+- Compared with `armor-status-neoforge`, which releases on a pushed `vX.Y.Z` tag with a per-Minecraft build matrix
+  and a manual dry run, SetHome releases on a version change on branch `26` with one jar covering 26.1.2–26.3. Ideas
+  not adopted: per-version jars, a dry-run workflow, and a changelog-section requirement.
+
+## GitHub Actions upgrades (`chore/deps-3.0.1`)
+
+All external Actions are pinned to immutable release commit SHAs with `# vX.Y.Z` comments: checkout `v7.0.1`,
+setup-java `v6.1.0`, gradle/actions/setup-gradle `v6.4.0` (with `cache-provider: basic` to avoid silently enabling
+the enhanced caching service), upload-artifact `v7.0.2` paired with download-artifact `v8.0.2` (the majors differ on
+purpose; keep default `archive: true`), and `Kira-NT/mc-publish` `v3.3.1` (the canonical owner; `Kir-Antipov/...`
+redirects). Regression tests enforce the SHA-pin shape, the v7/v8 pairing, the cache provider, and forbid
+`archive: false`. The native review flagged the mc-publish owner change as a provenance warning: the SHA was
+verified against the `v3.3.1` tag through the GitHub API, but this is the step that receives `MODRINTH_TOKEN`, so
+re-verify it when bumping.
+
+## Runtime verification and known advisories
+
+- Packaged-jar startup was tested on a disposable loopback-only server (never a public exposure, no production
+  data): `sethome-3.0.0` on 26.3.0.92 with user acceptance of save/list/teleport, duplicate rejection, name
+  normalization, the five-home limit, deletion, and restart persistence on FILE storage; then `sethome-3.0.1`
+  reached `Done`, initialized FILE storage, answered a console command and shut down cleanly (exit 0).
+- An independent verifier ran 18 startup/restart checks across 26.1.2, 26.2 and 26.3 and all three storage
+  backends (including the MongoDB unique index) with no silent FILE fallback. Populated SQLite/MongoDB player CRUD
+  was *not* exercised; only FILE gameplay was confirmed by hand.
+- Windows Netty native-library errors (`Could not initialize class io.netty.channel.epoll.Native`, "Only supported on
+  Linux") appear in the debug appender even without mods. They are a platform logging advisory, not a SetHome
+  regression; do not treat them as startup failures.
+- A server-list ping written with a hand-built handshake packet returned an empty response; use the console
+  `list` command plus a TCP connect to prove readiness instead of a raw status-protocol probe.
+- `actionlint` 1.7.12 validated the workflows once (without shellcheck/pyflakes); it was not available for the
+  later Action-pin change, so hosted execution of the upgraded Actions is unverified.
+
+## Process notes
+
+- The project's own native reviews (platform, release, and Actions/Gradle) all approved with non-blocking
+  advisories only: duplicated publication metadata constants, text-based and mock-heavy workflow tests, the
+  mc-publish owner change, and the regenerated `gradlew.bat`/wrapper JAR not being hand-verifiable from a diff.
+- This repository is under OneDrive on Windows; this work ran in sibling worktrees outside it
+  (`C:\Users\alexa\SetHome-worktrees\stable-26.3`, `...\deps-3.0.1`) to avoid sync-lock errors in `build/`.
+- Data sources: Gradle `services.gradle.org/versions/current` and distribution/wrapper `.sha256` endpoints, Kotlin's
+  Gradle compatibility table, the NeoForge/KLF/Maven Central/Gradle plugin metadata files, the Modrinth version API,
+  and the GitHub releases and commit APIs for each Action tag.
