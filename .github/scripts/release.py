@@ -88,6 +88,14 @@ class GitHub:
         )
 
 
+def modrinth_versions_request(repository):
+    headers = {"User-Agent": f"{repository}/release-automation"}
+    # Draft or under-review projects answer 404 to anonymous requests, so authenticate when a token exists.
+    if os.environ.get("MODRINTH_TOKEN"):
+        headers["Authorization"] = os.environ["MODRINTH_TOKEN"]
+    return Request("https://api.modrinth.com/v2/project/HhUmEUqn/version", headers=headers)
+
+
 def release_identity(repository, version, sha, gh, stable=False):
     tag = gh.api(f"repos/{repository}/commits/{quote('refs/tags/' + version, safe='')}")
     existing = gh.api(f"repos/{repository}/releases/tags/{quote(version, safe='')}")
@@ -171,8 +179,7 @@ def main(command):
     _, existing = release_identity(repository, version, sha, gh)
     if existing is None:
         raise ValueError("GitHub release must exist before Modrinth publication")
-    request = Request("https://api.modrinth.com/v2/project/HhUmEUqn/version",
-                      headers={"User-Agent": f"{repository}/release-automation"})
+    request = modrinth_versions_request(repository)
     with urlopen(request, timeout=30) as response:
         versions = json.load(response)
     published = already_published(versions, version, jar.read_bytes(), existing["prerelease"])
