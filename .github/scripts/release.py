@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 import uuid
@@ -96,6 +97,18 @@ def modrinth_versions_request(repository):
     return Request("https://api.modrinth.com/v2/project/HhUmEUqn/version", headers=headers)
 
 
+def modrinth_versions(repository):
+    try:
+        with urlopen(modrinth_versions_request(repository), timeout=30) as response:
+            return json.load(response)
+    except HTTPError as error:
+        # A project that is still a draft or under review is hidden (404) even to its token, so it has no
+        # visible versions yet; Modrinth itself rejects a duplicate version number on upload.
+        if error.code != 404:
+            raise
+        return []
+
+
 def release_identity(repository, version, sha, gh, stable=False):
     tag = gh.api(f"repos/{repository}/commits/{quote('refs/tags/' + version, safe='')}")
     existing = gh.api(f"repos/{repository}/releases/tags/{quote(version, safe='')}")
@@ -179,9 +192,7 @@ def main(command):
     _, existing = release_identity(repository, version, sha, gh)
     if existing is None:
         raise ValueError("GitHub release must exist before Modrinth publication")
-    request = modrinth_versions_request(repository)
-    with urlopen(request, timeout=30) as response:
-        versions = json.load(response)
+    versions = modrinth_versions(repository)
     published = already_published(versions, version, jar.read_bytes(), existing["prerelease"])
     output(already_published=str(published).lower(), version=version, jar=str(jar),
            name=existing["name"] or version, changelog=existing["body"] or "",
