@@ -159,6 +159,12 @@ source file. The setting has no effect in FILE mode or when startup falls back t
 
 Install JDK **25**, clone this repository, and run the included Gradle wrapper from the repository root.
 
+SetHome `3.0.1` is a build/CI maintenance release; gameplay and the Minecraft compatibility range are unchanged.
+The wrapper pins Gradle **9.8.1** with its official distribution checksum. Kotlin `2.4.21` documents full Gradle
+support only through **9.7.0**. Local 9.8.1 qualification covered compilation, packaging, client/server run
+preparation, and packaged-mod startup on NeoForge 26.3 with FILE storage; it does not imply upstream support.
+Kotlin remains paired with the version bundled by KotlinLangForge.
+
 On Linux or macOS:
 
 ```sh
@@ -215,7 +221,7 @@ qualification before deliberately pushing a stable version change; implementing 
 a push or a live release.
 
 1. Qualify the candidate, then change `mod_version` in [gradle.properties](gradle.properties) to a stable SemVer
-   such as `3.0.0`.
+   such as `3.0.1`.
 2. When authorized, push to the exact branch `26`.
    [.github/workflows/release.yml](.github/workflows/release.yml) compares the parsed version before and after
    the push. Unchanged versions, prereleases and initial branch-creation pushes do not publish; invalid versions

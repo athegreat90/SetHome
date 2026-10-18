@@ -37,9 +37,15 @@ repository-relative links for GitHub.
 
 On Windows PowerShell, use `.\gradlew.bat` in place of `./gradlew` for every command above.
 
-The Gradle wrapper is pinned to 9.7.0 with its distribution SHA-256. Kotlin 2.4.21 documents support through
-Gradle 9.7.0, so do not automatically select a newer Gradle without checking the Kotlin and ModDevGradle
-compatibility constraints.
+The Gradle wrapper is pinned to 9.8.1 with its official distribution SHA-256. Kotlin 2.4.21 documents full
+support only through Gradle 9.7.0. Local 9.8.1 qualification covered compilation, packaging, client/server run
+preparation, and packaged-mod startup on NeoForge 26.3 with FILE storage, not an upstream compatibility
+guarantee. Check Kotlin and ModDevGradle compatibility and repeat qualification when changing the wrapper.
+Keep Kotlin paired with KotlinLangForge.
+
+The build/release/publish workflows pin external Actions to immutable release commit SHAs with version
+comments. Update artifact upload v7 and download v8 together; retain archive-based candidate transfer and
+`cache-provider: basic` for Gradle Actions to avoid silently opting into enhanced caching.
 
 `settings.gradle` applies the `org.gradle.toolchains.foojay-resolver-convention` plugin so Gradle can
 auto-provision the JDK 25 toolchain `build.gradle` requests, even on a machine whose system JDK is a different
