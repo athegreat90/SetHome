@@ -21,9 +21,12 @@ repository-relative links for GitHub.
 ## Build and run commands
 
 - `./gradlew build` — compile and package the mod jar (this is what CI runs, see `.github/workflows/build.yml`)
-  on every push/PR; `.github/workflows/publish.yml` is separate — it only runs when a GitHub Release is published,
-  and publishes the built jar to Modrinth via the `Kir-Antipov/mc-publish` action (no Gradle-side plugin/config
-  needed for that — see `img/modrinth/PUBLISHING.md` and the README's "Publishing a release" section).
+  on every push/PR. `.github/workflows/release.yml` creates a stable release only when a push to branch `26`
+  changes `mod_version` to a stable SemVer, after building the exact commit. It explicitly calls reusable
+  `.github/workflows/publish.yml` because `GITHUB_TOKEN`-created releases do not trigger release-event workflows.
+  Manual GitHub Releases still trigger publishing; tools and released sources use separate exact-revision
+  checkouts. Version-scoped locks and identity checks protect retries without dropping unrelated versions.
+  Modrinth publishing uses the existing `MODRINTH_TOKEN` secret; never push a version bump before qualification.
 - `./gradlew runClient` — launch a Minecraft client with the mod loaded
 - `./gradlew runServer` — launch a dedicated server with the mod loaded
 - `./gradlew runGameTestServer` — run the gametest server harness
@@ -43,7 +46,10 @@ auto-provision the JDK 25 toolchain `build.gradle` requests, even on a machine w
 version — useful for local dev. CI (`.github/workflows/build.yml`) provisions JDK 25 directly via
 `actions/setup-java`, matching the project's toolchain requirement (see the JDK 25 note further down).
 
-There is no test suite in this repo (no `src/test` directory) and no lint task beyond normal compilation.
+There is no Kotlin unit-test suite (`src/test` is absent) or Gradle lint task beyond normal compilation.
+Release automation has offline Python standard-library tests: on Windows, run
+`python -m unittest discover -s .github\scripts\tests -v` (use `/` separators on Linux/macOS).
+CI runs these tests on pushes and pull requests. They do not perform live GitHub or Modrinth writes.
 `./gradlew runGameTestServer` is configured, but this repo currently defines no actual GameTests, so — like a
 successful `build` — a successful run there doesn't verify mod loading or behavior either.
 

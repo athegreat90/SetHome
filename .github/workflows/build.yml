@@ -12,6 +12,9 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      - name: Test release automation offline
+        run: python3 -m unittest discover -s .github/scripts/tests -v
+
       - name: Setup JDK 25
         uses: actions/setup-java@v4
         with:

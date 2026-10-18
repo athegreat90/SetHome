@@ -1,0 +1,86 @@
+name: Release stable version
+
+on:
+  push:
+    branches: ['26']
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Test release automation offline
+        run: python3 -m unittest discover -s .github/scripts/tests -v
+      - id: version
+        name: Compare parsed versions across this push
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: python3 .github/scripts/release.py gate
+
+  build:
+    needs: gate
+    if: needs.gate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: temurin
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew build
+      - id: candidate
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+          COMMIT: ${{ github.sha }}
+        run: python3 .github/scripts/release.py candidate
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate
+          path: ${{ steps.candidate.outputs.jar }}
+          if-no-files-found: error
+
+  create-release:
+    needs: [gate, build]
+    concurrency:
+      group: sethome-release-${{ needs.gate.outputs.version }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-candidate
+          path: candidate
+      - name: Create or verify the exact release and asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.gate.outputs.version }}
+          COMMIT: ${{ github.sha }}
+          JAR_DIRECTORY: candidate
+        run: python3 .github/scripts/release.py release
+
+  publish:
+    needs: [gate, create-release]
+    uses: ./.github/workflows/publish.yml
+    with:
+      version: ${{ needs.gate.outputs.version }}
+      commit: ${{ github.sha }}
+      artifact: release-candidate
+    secrets:
+      MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
