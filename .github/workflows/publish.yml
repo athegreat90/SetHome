@@ -3,39 +3,90 @@ name: Publish to Modrinth
 on:
   release:
     types: [published]
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      commit:
+        type: string
+        required: true
+      artifact:
+        type: string
+        required: true
+    secrets:
+      MODRINTH_TOKEN:
+        required: true
+
+permissions:
+  contents: read
 
 jobs:
   publish:
+    concurrency:
+      group: sethome-modrinth-${{ inputs.version || github.event.release.tag_name }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: source
     steps:
-      - name: Checkout repository
+      - name: Checkout executing workflow tools
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.workflow_sha }}
+          path: tools
+
+      - name: Checkout exact release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit || format('refs/tags/{0}', github.event.release.tag_name) }}
+          path: source
           fetch-depth: 0
           fetch-tags: true
 
       - name: Setup JDK 25
+        if: ${{ !inputs.artifact }}
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
 
       - name: Setup Gradle
+        if: ${{ !inputs.artifact }}
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build with Gradle
+        if: ${{ !inputs.artifact }}
         run: ./gradlew build
 
+      - name: Reuse the exact GitHub release candidate
+        if: ${{ inputs.artifact }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: source/candidate
+
+      - name: Verify release identity and check for an existing Modrinth version
+        id: publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version || github.event.release.tag_name }}
+          COMMIT: ${{ inputs.commit }}
+          JAR_DIRECTORY: ${{ inputs.artifact && 'candidate' || 'build/libs' }}
+        run: python3 ../tools/.github/scripts/release.py check
+
       - name: Publish to Modrinth
+        if: steps.publication.outputs.already_published != 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           modrinth-id: HhUmEUqn
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          files: build/libs/*.jar
-          name: ${{ github.event.release.name }}
-          version: ${{ github.event.release.tag_name }}
-          version-type: ${{ github.event.release.prerelease && 'beta' || 'release' }}
-          changelog: ${{ github.event.release.body }}
+          files: source/${{ steps.publication.outputs.jar }}
+          name: ${{ steps.publication.outputs.name }}
+          version: ${{ steps.publication.outputs.version }}
+          version-type: ${{ steps.publication.outputs.version_type }}
+          changelog: ${{ steps.publication.outputs.changelog }}
           loaders: neoforge
           environment: dedicated-server
           game-versions: |

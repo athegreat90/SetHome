@@ -14,13 +14,13 @@ The current source targets:
 | Component | Version |
 | --- | --- |
 | Minecraft | 26.1.2 – 26.3 |
-| NeoForge | 26.1.2.109 or newer (built/verified against 26.3.0.37-beta) |
-| KotlinLangForge | 2.14.1-k2.4.20-3.1+neoforge or newer |
+| NeoForge | 26.1.2.109 or newer (built against stable 26.3.0.92) |
+| KotlinLangForge | 2.15.0-k2.4.21-3.1+neoforge or newer compatible release |
 | Java | 25 |
 
-Minecraft, NeoForge, and mod versions are defined in [gradle.properties](gradle.properties). NeoForge has not
-yet published a stable build for Minecraft 26.3 as of this writing, so the mod is currently built against the
-latest 26.3 beta (`26.3.0.37-beta`); re-pin `neo_version` to a stable 26.3.0.x release once NeoForge ships one.
+Minecraft, NeoForge, and mod versions are defined in [gradle.properties](gradle.properties). The compile/run
+target is stable NeoForge `26.3.0.92`; the minimum loader version remains independent so older supported
+Minecraft installations are not excluded by the newer build target.
 See `MEMORY.md` for the version-compatibility decisions behind this range, including a runtime compatibility
 shim needed for a config-registration API that NeoForge renamed between the loader used for 26.1.2/26.2 and the
 one used for 26.3.
@@ -28,10 +28,10 @@ one used for 26.3.
 The mod's source is Kotlin, so the server also needs
 [KotlinLangForge](https://modrinth.com/mod/kotlin-lang-forge) installed alongside SetHome to supply the Kotlin
 runtime — SetHome loads via KotlinLangForge's own `klf` language loader (see `neoforge.mods.toml`), which covers
-Minecraft 26.1.2 through 26.3 as of KotlinLangForge `2.14.1-k2.4.20-3.1+neoforge`.
+Minecraft 26.1.2 through 26.3 with KotlinLangForge `2.15.0-k2.4.21-3.1+neoforge`.
 
 1. Set up a NeoForge server using the versions above.
-2. Install [KotlinLangForge](https://modrinth.com/mod/kotlin-lang-forge) (`2.14.1-k2.4.20-3.1+neoforge`+) in the
+2. Install [KotlinLangForge](https://modrinth.com/mod/kotlin-lang-forge) (`2.15.0-k2.4.21-3.1+neoforge`) in the
    server's `mods/` directory alongside SetHome.
 3. Obtain the SetHome JAR, or [build it from source](#development).
 4. Place the mod JAR in the server's `mods/` directory.
@@ -183,13 +183,60 @@ Useful development commands (use `.\gradlew.bat` instead of `./gradlew` on Windo
 | `./gradlew clean` | Remove build outputs. |
 | `./gradlew build --refresh-dependencies` | Refresh the dependency cache and rebuild. |
 
+### Local server and client acceptance test
+
+Use a disposable world outside the repository and cloud-synced directories. A successful build does not prove
+that Minecraft loads the mod or that player commands work.
+
+1. Install a dedicated NeoForge `26.3.0.92` server using JDK 25. Put the packaged SetHome JAR and
+   KotlinLangForge `2.15.0-k2.4.21-3.1+neoforge` in its `mods/` directory.
+2. Read and accept the [Minecraft EULA](https://aka.ms/MinecraftEULA) yourself before enabling `eula=true`.
+   In `server.properties`, bind `server-ip=127.0.0.1` and use an available port, for example `server-port=25583`.
+   Keep query and RCON disabled.
+3. Start the server with `run.bat nogui` on Windows. In a second terminal at the project root, run
+   `.\gradlew.bat runClient` to launch the NeoForge development client.
+4. The development client uses the unauthenticated `Dev` account. Only for this disposable loopback-bound
+   server, and only with explicit consent, use `online-mode=false`. Never use that setting for a public server.
+   An authenticated normal launcher client can instead join with `online-mode=true`.
+5. In Multiplayer, use Direct Connection to `127.0.0.1:25583`. Run `/sethome base`, `/homes`, move away,
+   and run `/home base`; verify position and facing are restored.
+6. Confirm duplicate names are rejected, names are normalized, and the configured home limit is enforced.
+   Use `stop` in the server console, restart the same server, reconnect, and verify `base` still exists.
+7. Run `/delhome base`; `/homes` must omit it and `/home base` must report that it does not exist.
+
+The project development client includes the mod and KLF for development. Separately test with an ordinary
+matching client without SetHome/KLF to verify server-only installation. Before advertising the complete
+compatibility range, repeat packaged-JAR loading and storage checks on Minecraft 26.1.2 and 26.2 as well.
+
 ### Publishing a release
 
-1. Bump `mod_version` in [gradle.properties](gradle.properties).
-2. Publish a GitHub Release with a tag matching that version (e.g. `3.0.0-RC1`). Mark it as a pre-release for
-   anything other than a stable release — the workflow below maps that to Modrinth's `beta` version type.
-3. [.github/workflows/publish.yml](.github/workflows/publish.yml) runs automatically, builds the mod, and uploads
-   it to Modrinth using the release's tag as the version and its release notes as the changelog.
+**A version-changing push to branch `26` publishes automatically.** Finish compatibility and hands-on
+qualification before deliberately pushing a stable version change; implementing this workflow does not authorize
+a push or a live release.
+
+1. Qualify the candidate, then change `mod_version` in [gradle.properties](gradle.properties) to a stable SemVer
+   such as `3.0.0`.
+2. When authorized, push to the exact branch `26`.
+   [.github/workflows/release.yml](.github/workflows/release.yml) compares the parsed version before and after
+   the push. Unchanged versions, prereleases and initial branch-creation pushes do not publish; invalid versions
+   fail validation.
+3. The workflow builds that exact commit successfully before creating a tag named exactly `mod_version` (no `v`
+   prefix) and a GitHub Release with generated notes. The same packaged JAR is attached to GitHub and passed to
+   [.github/workflows/publish.yml](.github/workflows/publish.yml) for Modrinth, using the existing `MODRINTH_TOKEN`
+   Actions secret. The reusable call is explicit because `GITHUB_TOKEN`-created releases do not trigger another
+   release-event workflow.
+
+Manual GitHub Releases remain supported: use a tag matching that commit's `mod_version`, mark prereleases as
+pre-release, and publish the release. The publishing workflow builds the tag's commit, not the branch head,
+and maps stable releases to Modrinth `release` and prereleases to `beta`.
+
+Release creation and publication are serialized per version without canceling in-flight uploads; unrelated pushes
+and other versions do not share a pending-publication lock. Manual tag builds use release source separately from
+the executing workflow's helper checkout, so legacy tags need not contain the helper.
+Rerun a failed workflow to recover a missing
+upload: matching GitHub releases/assets and matching Modrinth versions are reused, not overwritten or uploaded
+twice. A tag pointing elsewhere or an existing artifact/metadata mismatch fails explicitly; investigate rather
+than moving a released tag. No live Actions or Modrinth publication is verified by the offline tests.
 
 ### Resources and licensing
 

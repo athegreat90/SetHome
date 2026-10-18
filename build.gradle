@@ -4,9 +4,9 @@ plugins {
     id 'net.neoforged.moddev' version '2.0.148'
     id 'idea'
     // Pinned to match the Kotlin version bundled by kotlinlangforge_version in gradle.properties
-    // (KotlinLangForge 2.14.1-k2.4.20-3.1+neoforge bundles Kotlin 2.4.20) - the plugins {} block only accepts
+    // (KotlinLangForge 2.15.0-k2.4.21-3.1+neoforge bundles Kotlin 2.4.21) - the plugins {} block only accepts
     // literal version strings, so this can't reference that property directly; keep the two in sync by hand.
-    id 'org.jetbrains.kotlin.jvm' version '2.4.20'
+    id 'org.jetbrains.kotlin.jvm' version '2.4.21'
 }
 
 tasks.named('wrapper', Wrapper).configure {
@@ -31,13 +31,13 @@ repositories {
     }
 }
 
-def mongoDriverVersion = '5.8.0'
-def sqliteDriverVersion = '3.49.1.0'
+def mongoDriverVersion = '5.13.0'
+def sqliteDriverVersion = '3.53.4.0'
 
 dependencies {
     jarJar(implementation("org.mongodb:mongodb-driver-sync:${mongoDriverVersion}")) {
         version {
-            strictly '[5.8,5.9)'
+            strictly '[5.13,5.14)'
             prefer mongoDriverVersion
         }
     }
@@ -45,19 +45,19 @@ dependencies {
     // dependencies automatically, so each jarred artifact must be declared explicitly.
     jarJar(implementation("org.mongodb:mongodb-driver-core:${mongoDriverVersion}")) {
         version {
-            strictly '[5.8,5.9)'
+            strictly '[5.13,5.14)'
             prefer mongoDriverVersion
         }
     }
     jarJar(implementation("org.mongodb:bson:${mongoDriverVersion}")) {
         version {
-            strictly '[5.8,5.9)'
+            strictly '[5.13,5.14)'
             prefer mongoDriverVersion
         }
     }
     jarJar(implementation("org.xerial:sqlite-jdbc:${sqliteDriverVersion}")) {
         version {
-            strictly "[${sqliteDriverVersion},3.50)"
+            strictly "[${sqliteDriverVersion},3.54)"
             prefer sqliteDriverVersion
         }
     }

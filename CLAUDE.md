@@ -21,9 +21,12 @@ repository-relative links for GitHub.
 ## Build and run commands
 
 - `./gradlew build` — compile and package the mod jar (this is what CI runs, see `.github/workflows/build.yml`)
-  on every push/PR; `.github/workflows/publish.yml` is separate — it only runs when a GitHub Release is published,
-  and publishes the built jar to Modrinth via the `Kir-Antipov/mc-publish` action (no Gradle-side plugin/config
-  needed for that — see `img/modrinth/PUBLISHING.md` and the README's "Publishing a release" section).
+  on every push/PR. `.github/workflows/release.yml` creates a stable release only when a push to branch `26`
+  changes `mod_version` to a stable SemVer, after building the exact commit. It explicitly calls reusable
+  `.github/workflows/publish.yml` because `GITHUB_TOKEN`-created releases do not trigger release-event workflows.
+  Manual GitHub Releases still trigger publishing; tools and released sources use separate exact-revision
+  checkouts. Version-scoped locks and identity checks protect retries without dropping unrelated versions.
+  Modrinth publishing uses the existing `MODRINTH_TOKEN` secret; never push a version bump before qualification.
 - `./gradlew runClient` — launch a Minecraft client with the mod loaded
 - `./gradlew runServer` — launch a dedicated server with the mod loaded
 - `./gradlew runGameTestServer` — run the gametest server harness
@@ -34,12 +37,19 @@ repository-relative links for GitHub.
 
 On Windows PowerShell, use `.\gradlew.bat` in place of `./gradlew` for every command above.
 
+The Gradle wrapper is pinned to 9.7.0 with its distribution SHA-256. Kotlin 2.4.21 documents support through
+Gradle 9.7.0, so do not automatically select a newer Gradle without checking the Kotlin and ModDevGradle
+compatibility constraints.
+
 `settings.gradle` applies the `org.gradle.toolchains.foojay-resolver-convention` plugin so Gradle can
 auto-provision the JDK 25 toolchain `build.gradle` requests, even on a machine whose system JDK is a different
 version — useful for local dev. CI (`.github/workflows/build.yml`) provisions JDK 25 directly via
 `actions/setup-java`, matching the project's toolchain requirement (see the JDK 25 note further down).
 
-There is no test suite in this repo (no `src/test` directory) and no lint task beyond normal compilation.
+There is no Kotlin unit-test suite (`src/test` is absent) or Gradle lint task beyond normal compilation.
+Release automation has offline Python standard-library tests: on Windows, run
+`python -m unittest discover -s .github\scripts\tests -v` (use `/` separators on Linux/macOS).
+CI runs these tests on pushes and pull requests. They do not perform live GitHub or Modrinth writes.
 `./gradlew runGameTestServer` is configured, but this repo currently defines no actual GameTests, so — like a
 successful `build` — a successful run there doesn't verify mod loading or behavior either.
 
@@ -65,9 +75,9 @@ changes.
   into `src/main/templates/META-INF/neoforge.mods.toml` at build time via the `generateModMetadata` Gradle task
   (placeholders like `${mod_id}` are expanded from the matching Gradle property).
 - The mod declares support for Minecraft `26.1.2` through `26.3` inclusive via
-  `minecraft_version_range=[26.1.2,26.4)` in `gradle.properties`. NeoForge has not shipped a stable build for
-  Minecraft 26.3 yet, so `neo_version` is pinned to the latest 26.3 beta (`26.3.0.37-beta`); re-pin it to a
-  stable 26.3.0.x build once one exists.
+  `minecraft_version_range=[26.1.2,26.4)` in `gradle.properties`. The compile/run target `neo_version` is
+  pinned to stable NeoForge `26.3.0.92`. Keep the independently declared minimum loader version unchanged
+  unless runtime qualification requires a deliberate compatibility change.
 - `neo_version` and `neo_version_range` are deliberately separate properties: `neo_version` is the single exact
   NeoForge artifact ModDevGradle compiles and runs against, while `neo_version_range` is the floor for the
   `neoforge` mod dependency in `neoforge.mods.toml` (pinned to the previously-verified 26.1.2 build). Do not
@@ -91,10 +101,10 @@ changes.
   serialization classes. Unlike a normal mod dependency, this is declared via `neoforge.mods.toml`'s top-level
   `modLoader="klf"` / `loaderVersion="[1,)"` — **not** a `[[dependencies.sethome]]` entry — because a standard
   FML dependency version check against KLF's full artifact version string
-  (`kotlinlangforge_version` in `gradle.properties`, e.g. `2.14.1-k2.4.20-3.1+neoforge`) does not work: confirmed
+  (`kotlinlangforge_version` in `gradle.properties`, e.g. `2.15.0-k2.4.21-3.1+neoforge`) does not work: confirmed
   by testing, FML reports the installed version as `[MISSING]` (unparseable as a plain Maven version) even when
   the range matches exactly. The `loaderVersion` instead checks KLF's own small "language provider version"
-  (`3.1` for this release). The Kotlin Gradle plugin version in `build.gradle` (currently `2.4.20`, a literal —
+  (`3.1` for this release). The Kotlin Gradle plugin version in `build.gradle` (currently `2.4.21`, a literal —
   the `plugins {}` block can't reference a property) is deliberately pinned to match the Kotlin version KLF
   bundles; bump both together, never independently, and re-check KLF's Minecraft/NeoForge support range on each
   bump. This replaced an earlier dependency on "Kotlin for Forge" (KFF, `thedarkcolour`), which didn't support
