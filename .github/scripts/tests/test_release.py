@@ -234,7 +234,7 @@ class WorkflowTests(unittest.TestCase):
 
     def test_build_precedes_release_and_reusable_publication(self):
         text = (ROOT / ".github/workflows/release.yml").read_text()
-        self.assertIn("branches: ['26']", text)
+        self.assertIn("branches: ['main']", text)
         self.assertIn("needs: gate", text)
         self.assertIn("needs: [gate, build]", text)
         self.assertIn("needs: [gate, create-release]", text)
@@ -305,6 +305,12 @@ class CommandTests(unittest.TestCase):
         with patch.object(release.subprocess, "run") as run:
             run.return_value = subprocess.CompletedProcess([], 1, "", "HTTP 404: Not Found")
             self.assertIsNone(gh.api("endpoint"))
+            run.return_value = subprocess.CompletedProcess(
+                [], 1, "", "gh: No commit found for SHA: refs/tags/1.0.0 (HTTP 422)")
+            self.assertIsNone(gh.api("endpoint"))
+            run.return_value = subprocess.CompletedProcess([], 1, "", "HTTP 422: Validation Failed")
+            with self.assertRaises(RuntimeError):
+                gh.api("endpoint")
             run.return_value = subprocess.CompletedProcess([], 1, "", "HTTP 403: Forbidden")
             with self.assertRaises(RuntimeError):
                 gh.api("endpoint")
