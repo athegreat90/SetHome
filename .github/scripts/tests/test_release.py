@@ -2,6 +2,7 @@ import importlib.util
 from contextlib import chdir
 import io
 import json
+import re
 import shutil
 import subprocess
 import unittest
@@ -183,6 +184,28 @@ class ModrinthTests(unittest.TestCase):
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_external_actions_use_immutable_release_pins(self):
+        for name in ["build.yml", "release.yml", "publish.yml"]:
+            text = (ROOT / ".github/workflows" / name).read_text()
+            for action in re.findall(r"uses: ([^\r\n]+)", text):
+                if action.startswith("./"):
+                    continue
+                with self.subTest(workflow=name, action=action):
+                    self.assertRegex(action, r"^[\w./-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$")
+
+    def test_artifact_actions_and_gradle_cache_preserve_transfer_behavior(self):
+        for name in ["build.yml", "release.yml", "publish.yml"]:
+            text = (ROOT / ".github/workflows" / name).read_text()
+            with self.subTest(workflow=name):
+                self.assertEqual(text.count("cache-provider: basic"),
+                                 text.count("uses: gradle/actions/setup-gradle@"))
+                self.assertNotIn("archive: false", text)
+                for line in text.splitlines():
+                    if "uses: actions/upload-artifact@" in line:
+                        self.assertRegex(line, r"@[0-9a-f]{40} # v7\.")
+                    if "uses: actions/download-artifact@" in line:
+                        self.assertRegex(line, r"@[0-9a-f]{40} # v8\.")
+
     def test_version_locks_exist_only_in_gated_jobs(self):
         text = (ROOT / ".github/workflows/release.yml").read_text()
         self.assertNotIn("\nconcurrency:", text)
@@ -224,7 +247,7 @@ class WorkflowTests(unittest.TestCase):
         text = (ROOT / ".github/workflows/publish.yml").read_text()
         for expected in ["workflow_call:", "types: [published]", "inputs.commit ||",
                          "if: ${{ !inputs.artifact }}", "if: ${{ inputs.artifact }}",
-                         "actions/download-artifact@v4", "already_published",
+                         "actions/download-artifact@", "already_published",
                          "dedicated-server", "26.1.2", "26.2", "26.3", "java: 25",
                          "version-type:", "secrets.MODRINTH_TOKEN"]:
             self.assertIn(expected, text)
