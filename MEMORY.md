@@ -507,3 +507,17 @@ re-verify it when bumping.
 - Data sources: Gradle `services.gradle.org/versions/current` and distribution/wrapper `.sha256` endpoints, Kotlin's
   Gradle compatibility table, the NeoForge/KLF/Maven Central/Gradle plugin metadata files, the Modrinth version API,
   and the GitHub releases and commit APIs for each Action tag.
+# Dependency refresh, SetHome 3.0.2, dated 2026-11-26
+
+- Branch `chore/deps-3.0.2` (not merged; a `mod_version` change on `main` auto-publishes). Gradle 9.8.1 -> 9.9.2
+  (dist SHA-256 `971fcd71…c76b`; wrapper JAR `621008af…daf8` matched Gradle's published value). NeoForge target
+  26.3.0.92 -> 26.3.0.118, KLF 2.15.0 -> 2.20.1 (still Kotlin 2.4.21, provider 3.1), MongoDB 5.13.0 -> 5.15.0
+  (`[5.15,5.16)`), sqlite-jdbc 3.53.4.0 -> 3.54.1.0 (`[3.54.1.0,3.55)`). Kotlin plugin stays 2.4.21 (2.5.0 is only RC);
+  ModDevGradle 2.0.148 already latest. Actions: setup-java v6.3.0, setup-gradle v6.4.1 (annotated tag; the pinned SHA
+  is the dereferenced commit `8da46b5…`), mc-publish v3.3.2.
+- `createMinecraftArtifacts` failed intermittently with "The process cannot access the file" moving
+  `mergeWithSources` output into `~/.gradle/caches/neoformruntime` — on both the OneDrive checkout and a worktree
+  outside it; a plain retry succeeded. Treat as a Windows file-lock flake, retry before investigating.
+- Verified: `build`, `prepareServerRun`, `prepareClientRun`, 37 offline Python tests, jarJar contents (Mongo 5.15.0,
+  sqlite 3.54.1.0). NOT verified: packaged-jar server start and populated SQLite/Mongo CRUD on the new versions.
+- `CHANGELOG.md` introduced; pre-3.0.2 entries are reconstructed from commit dates and historical `mod_version`s.
