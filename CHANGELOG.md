@@ -7,6 +7,16 @@ Entries before 3.0.2 were reconstructed from the git history (commit dates and t
 `gradle.properties` at each commit). Only `3.0.0-RC1` and `3.0.1` were ever tagged; other versions map to the commit
 named in parentheses.
 
+## [Unreleased]
+
+### Added
+- Snapshot pre-releases: every push to `main` that changes code (and a manual workflow dispatch) publishes a GitHub
+  pre-release `<mod_version>-main.<run number>` with the packaged JAR. Snapshots never publish to Modrinth.
+
+### Fixed
+- Release automation: the gate now accepts `refs/heads/main` (it still required the retired branch `26`, so a version
+  bump on `main` never released) (#8).
+
 ## [3.0.2] - 2026-11-26
 
 Maintenance release: dependency, Gradle and CI upgrades. No gameplay change; supported Minecraft range
@@ -97,6 +107,7 @@ First stable release of the Kotlin line, qualified on stable NeoForge 26.3.
 - Initial release for Minecraft 1.21.11 (NeoForge 21.1.226): `/sethome`, `/home`, `/homes` and `/delhome`, with a
   file-based store and a configurable `maxHomesPerPlayer` limit.
 
-[3.0.2]: https://github.com/athegreat90/SetHome/compare/3.0.1...HEAD
+[Unreleased]: https://github.com/athegreat90/SetHome/compare/3.0.1...HEAD
+[3.0.2]: https://github.com/athegreat90/SetHome/compare/3.0.1...461d14e
 [3.0.1]: https://github.com/athegreat90/SetHome/compare/3.0.0-RC1...3.0.1
 [3.0.0-RC1]: https://github.com/athegreat90/SetHome/releases/tag/3.0.0-RC1

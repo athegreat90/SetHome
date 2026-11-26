@@ -216,16 +216,25 @@ compatibility range, repeat packaged-JAR loading and storage checks on Minecraft
 
 ### Publishing a release
 
-**A version-changing push to branch `main` publishes automatically.** Finish compatibility and hands-on
-qualification before deliberately pushing a stable version change; implementing this workflow does not authorize
-a push or a live release.
+There are two release channels, both created by [.github/workflows/release.yml](.github/workflows/release.yml):
+
+- **Snapshots.** Every push to `main` that changes code (`src/**`, `build.gradle`, `settings.gradle`,
+  `gradle.properties`, `gradle/**`) publishes a GitHub **pre-release** tagged `<mod_version>-main.<run number>`
+  (for example `3.0.2-main.45`) with the packaged JAR. Snapshots are built with `-Pmod_version=<that version>`, never
+  touch Modrinth and need no version bump. Docs- or CI-only pushes publish nothing. Run the workflow manually
+  (Actions, "Release", Run workflow on `main`) to cut one on demand. Snapshots accumulate; delete old ones by hand.
+- **Stable releases.** A version-changing push to branch `main` publishes to GitHub and Modrinth, as described below.
+
+**A version-changing push to branch `main` publishes a stable release automatically.** Finish compatibility and
+hands-on qualification before deliberately pushing a stable version change; implementing this workflow does not
+authorize a push or a live release.
 
 1. Qualify the candidate, then change `mod_version` in [gradle.properties](gradle.properties) to a stable SemVer
    such as `3.0.1`.
 2. When authorized, push to the exact branch `main`.
    [.github/workflows/release.yml](.github/workflows/release.yml) compares the parsed version before and after
-   the push. Unchanged versions, prereleases and initial branch-creation pushes do not publish; invalid versions
-   fail validation.
+   the push. An unchanged version or a prerelease `mod_version` produces a snapshot instead, initial
+   branch-creation pushes publish nothing, and invalid versions fail validation.
 3. The workflow builds that exact commit successfully before creating a tag named exactly `mod_version` (no `v`
    prefix) and a GitHub Release with generated notes. The same packaged JAR is attached to GitHub and passed to
    [.github/workflows/publish.yml](.github/workflows/publish.yml) for Modrinth, using the existing `MODRINTH_TOKEN`

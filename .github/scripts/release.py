@@ -1,5 +1,6 @@
 """Offline-testable release checks; all mutations use the runner's gh CLI."""
 
+import functools
 import hashlib
 import json
 import os
@@ -46,6 +47,32 @@ def gate(ref, before, sha, read):
     if old == new or SEMVER.fullmatch(new).group(4) is not None:
         return None
     return new
+
+
+def snapshot_version(base, run_number):
+    # Build metadata is dropped so the snapshot stays a plain SemVer prerelease of the current mod_version.
+    version = f"{base.split('+')[0]}-main.{int(run_number)}"
+    if not SEMVER.fullmatch(version):
+        raise ValueError("Snapshot version is not valid SemVer")
+    return version
+
+
+def is_snapshot_of(version, base):
+    return re.fullmatch(re.escape(base.split("+")[0]) + r"-main\.\d+", version) is not None
+
+
+def plan(ref, event, before, sha, read, run_number):
+    """Return (kind, version): a stable release on a mod_version bump, otherwise a snapshot, else nothing."""
+    if ref != "refs/heads/main":
+        return "none", ""
+    read = functools.cache(read)
+    if event == "push":
+        stable = gate(ref, before, sha, read)
+        if stable is not None:
+            return "stable", stable
+        if before == "0" * 40:
+            return "none", ""
+    return "snapshot", snapshot_version(version_property(read(commit(sha))), run_number)
 
 
 def output(**values):
@@ -121,15 +148,20 @@ def release_identity(repository, version, sha, gh, stable=False):
     return tag, existing
 
 
-def ensure_release(repository, version, sha, jar, gh):
-    if not SEMVER.fullmatch(version) or SEMVER.fullmatch(version).group(4):
-        raise ValueError("Automatic releases require stable SemVer")
-    tag, existing = release_identity(repository, version, sha, gh, stable=True)
+def ensure_release(repository, version, sha, jar, gh, prerelease=False):
+    match = SEMVER.fullmatch(version)
+    if not match or bool(match.group(4)) != prerelease:
+        raise ValueError("Automatic releases require stable SemVer; snapshots require a prerelease SemVer")
+    tag, existing = release_identity(repository, version, sha, gh, stable=not prerelease)
+    if prerelease and existing is not None and not existing["prerelease"]:
+        raise ValueError("Existing release identity does not match")
     if existing is None:
         if tag is None:
             gh.create_tag(version, sha)
         args = ["release", "create", version, str(jar), "--target", sha,
                 "--title", version, "--generate-notes", "--verify-tag"]
+        if prerelease:
+            args.append("--prerelease")
         gh.run(args)
         return
     jars = [asset["name"] for asset in existing["assets"] if asset["name"].endswith(".jar")]
@@ -167,16 +199,19 @@ def candidate(directory, version):
 
 def main(command):
     if command == "gate":
-        version = gate(os.environ["GITHUB_REF"], os.environ["BEFORE"],
-                       os.environ["GITHUB_SHA"],
-                       lambda sha: git("show", f"{sha}:gradle.properties"))
-        output(version=version or "", publish=str(version is not None).lower())
+        kind, version = plan(os.environ["GITHUB_REF"], os.environ["GITHUB_EVENT_NAME"],
+                             os.environ.get("BEFORE", ""), os.environ["GITHUB_SHA"],
+                             lambda sha: git("show", f"{sha}:gradle.properties"),
+                             os.environ["GITHUB_RUN_NUMBER"])
+        output(kind=kind, version=version, publish=str(kind == "stable").lower())
         return
     version = os.environ.get("VERSION") or version_property(Path("gradle.properties").read_text())
     sha = commit(os.environ.get("COMMIT") or git("rev-parse", "HEAD"))
     if git("rev-parse", "HEAD") != sha:
         raise ValueError("Checkout is not the requested commit")
-    if version_property(Path("gradle.properties").read_text()) != version:
+    snapshot = os.environ.get("KIND") == "snapshot"
+    current = version_property(Path("gradle.properties").read_text())
+    if version != current and not (snapshot and is_snapshot_of(version, current)):
         raise ValueError("Release tag/version differs from the checked-out mod_version")
     jar = candidate(os.environ.get("JAR_DIRECTORY", "build/libs"), version)
     if command == "candidate":
@@ -185,7 +220,7 @@ def main(command):
     repository = os.environ["GITHUB_REPOSITORY"]
     gh = GitHub(repository)
     if command == "release":
-        ensure_release(repository, version, sha, jar, gh)
+        ensure_release(repository, version, sha, jar, gh, prerelease=snapshot)
         return
     if command != "check":
         raise ValueError("Unknown release command")

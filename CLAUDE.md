@@ -24,8 +24,10 @@ before 3.0.2 were reconstructed from git history.
 ## Build and run commands
 
 - `./gradlew build` — compile and package the mod jar (this is what CI runs, see `.github/workflows/build.yml`)
-  on every push/PR. `.github/workflows/release.yml` creates a stable release only when a push to branch `main`
-  changes `mod_version` to a stable SemVer, after building the exact commit. It explicitly calls reusable
+  on every push/PR. `.github/workflows/release.yml` (`release.py plan`) creates a stable release only when a push to
+  branch `main` changes `mod_version` to a stable SemVer, after building the exact commit; any other push that
+  changes code (`src/**`, Gradle files) or a manual dispatch on `main` creates a GitHub **pre-release snapshot**
+  `<mod_version>-main.<run number>` built with `-Pmod_version=...` that never reaches Modrinth. It explicitly calls reusable
   `.github/workflows/publish.yml` because `GITHUB_TOKEN`-created releases do not trigger release-event workflows.
   Manual GitHub Releases still trigger publishing; tools and released sources use separate exact-revision
   checkouts. Version-scoped locks and identity checks protect retries without dropping unrelated versions.

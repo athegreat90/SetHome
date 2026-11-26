@@ -68,6 +68,48 @@ class GateTests(unittest.TestCase):
         self.assertEqual(self.gate(new="2.0.0+build.1")[0], "2.0.0+build.1")
 
 
+class PlanTests(unittest.TestCase):
+    def plan(self, old="1.0.0", new="1.0.0", ref="refs/heads/main", event="push", before=BEFORE, run="7"):
+        read = Mock(side_effect=[f"mod_version={old}\n", f"mod_version={new}\n"])
+        return release.plan(ref, event, before, SHA, read, run), read
+
+    def test_version_bump_is_stable_and_wins_over_snapshot(self):
+        self.assertEqual(self.plan(new="2.0.0")[0], ("stable", "2.0.0"))
+
+    def test_code_push_without_bump_is_snapshot(self):
+        self.assertEqual(self.plan()[0], ("snapshot", "1.0.0-main.7"))
+
+    def test_prerelease_bump_is_snapshot_and_metadata_is_dropped(self):
+        self.assertEqual(self.plan(new="2.0.0-RC1")[0], ("snapshot", "2.0.0-RC1-main.7"))
+        self.assertEqual(self.plan(old="1.0.0+b.1", new="1.0.0+b.1")[0], ("snapshot", "1.0.0-main.7"))
+
+    def test_manual_dispatch_is_snapshot_without_a_before_commit(self):
+        read = Mock(return_value="mod_version=1.0.0\n")
+        result = release.plan("refs/heads/main", "workflow_dispatch", "", SHA, read, "9")
+        self.assertEqual(result, ("snapshot", "1.0.0-main.9"))
+        read.assert_called_once_with(SHA)
+
+    def test_initial_push_and_other_refs_release_nothing(self):
+        for args in [{"before": "0" * 40}, {"ref": "refs/heads/26"}, {"ref": "refs/pull/1/merge"},
+                     {"ref": "refs/heads/feature", "event": "workflow_dispatch"}]:
+            with self.subTest(args=args):
+                result, read = self.plan(**args)
+                self.assertEqual(result, ("none", ""))
+                read.assert_not_called()
+
+    def test_invalid_run_number_or_version_fails(self):
+        with self.assertRaises(ValueError):
+            self.plan(run="abc")
+        with self.assertRaises(ValueError):
+            self.plan(old="1.0.0", new="v1")
+
+    def test_snapshot_match_requires_the_current_mod_version(self):
+        self.assertTrue(release.is_snapshot_of("1.0.0-main.7", "1.0.0"))
+        self.assertTrue(release.is_snapshot_of("1.0.0-main.7", "1.0.0+b.1"))
+        for version in ["1.0.0", "1.0.1-main.7", "1.0.0-main.x", "1.0.0-main.7.1", "1.0.0-rc.7"]:
+            self.assertFalse(release.is_snapshot_of(version, "1.0.0"), version)
+
+
 class ReleaseTests(unittest.TestCase):
     def setUp(self):
         self.jar = Mock(spec=Path)
@@ -96,6 +138,33 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("candidate.jar", args)
         self.assertIn("refs%2Ftags%2F2.0.0", self.gh.api.call_args_list[0].args[0])
         self.gh.create_tag.assert_called_once_with("2.0.0", SHA)
+
+    def test_snapshot_creates_a_prerelease(self):
+        release.ensure_release("owner/repo", "2.0.0-main.7", SHA, self.jar, self.gh, prerelease=True)
+        args = self.gh.run.call_args.args[0]
+        self.assertIn("--prerelease", args)
+        self.assertIn("2.0.0-main.7", args)
+        self.gh.create_tag.assert_called_once_with("2.0.0-main.7", SHA)
+        self.assertNotIn("--prerelease", self.new_stable_args())
+
+    def new_stable_args(self):
+        self.gh.run.reset_mock()
+        self.ensure()
+        return self.gh.run.call_args.args[0]
+
+    def test_version_kind_must_match_release_kind(self):
+        with self.assertRaises(ValueError):
+            release.ensure_release("owner/repo", "2.0.0", SHA, self.jar, self.gh, prerelease=True)
+        with self.assertRaises(ValueError):
+            release.ensure_release("owner/repo", "2.0.0-main.7", SHA, self.jar, self.gh)
+        self.gh.run.assert_not_called()
+
+    def test_snapshot_never_reuses_a_stable_release(self):
+        self.tag = {"sha": SHA}
+        self.existing = {"tag_name": "2.0.0-main.7", "draft": False, "prerelease": False, "assets": []}
+        with self.assertRaises(ValueError):
+            release.ensure_release("owner/repo", "2.0.0-main.7", SHA, self.jar, self.gh, prerelease=True)
+        self.gh.run.assert_not_called()
 
     def test_tag_collision_does_not_create_release(self):
         self.gh.create_tag.side_effect = subprocess.CalledProcessError(1, "gh")
@@ -249,6 +318,16 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("cancel-in-progress: false", text)
         self.assertIn("MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}", text)
 
+    def test_snapshots_build_with_the_snapshot_version_and_never_publish_to_modrinth(self):
+        text = (ROOT / ".github/workflows/release.yml").read_text()
+        self.assertIn("workflow_dispatch:", text)
+        for path in ["'src/**'", "'build.gradle'", "'gradle.properties'", "'gradle/**'"]:
+            self.assertIn(f"- {path}", text)
+        self.assertIn("if: needs.gate.outputs.kind != 'none'", text)
+        self.assertIn('./gradlew build "-Pmod_version=$VERSION"', text)
+        publish = text.split("  publish:", 1)[1]
+        self.assertIn("if: needs.gate.outputs.kind == 'stable'", publish)
+
     def test_manual_and_automatic_paths_preserve_metadata(self):
         text = (ROOT / ".github/workflows/publish.yml").read_text()
         for expected in ["workflow_call:", "types: [published]", "inputs.commit ||",
@@ -380,6 +459,19 @@ class CommandTests(unittest.TestCase):
                     self.assertEqual(values["version_type"], "beta" if prerelease else "release")
                     self.assertEqual(values["changelog"], "Notes\n$(not shell)\nsecond line")
                     gh.run.assert_not_called()
+
+    def test_snapshot_release_command_accepts_the_snapshot_version_only_for_snapshots(self):
+        for kind, ok in [("snapshot", True), ("stable", False)]:
+            with self.subTest(kind=kind), patch.dict(release.os.environ, {
+                "VERSION": "2.0.0-main.7", "COMMIT": SHA, "KIND": kind, "GITHUB_REPOSITORY": "owner/repo"
+            }), patch.object(release, "git", return_value=SHA),                     patch.object(release.Path, "read_text", return_value="mod_version=2.0.0"),                     patch.object(release, "candidate", return_value=Mock()),                     patch.object(release, "GitHub"),                     patch.object(release, "ensure_release") as ensure:
+                if ok:
+                    release.main("release")
+                    self.assertTrue(ensure.call_args.kwargs["prerelease"])
+                else:
+                    with self.assertRaises(ValueError):
+                        release.main("release")
+                    ensure.assert_not_called()
 
     def test_wrong_checkout_fails_before_release_write(self):
         with patch.dict(release.os.environ, {"VERSION": "2.0.0", "COMMIT": SHA}), \
