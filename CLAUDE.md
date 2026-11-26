@@ -18,6 +18,9 @@ publishing to Modrinth, plus `img/modrinth/PUBLISHING.md` explaining upload orde
 second file called `README.md` in the repo); the root `README.md`'s Screenshots section embeds the same PNGs via
 repository-relative links for GitHub.
 
+`CHANGELOG.md` (Keep a Changelog format) records every release; add an entry whenever `mod_version` changes. Entries
+before 3.0.2 were reconstructed from git history.
+
 ## Build and run commands
 
 - `./gradlew build` — compile and package the mod jar (this is what CI runs, see `.github/workflows/build.yml`)
@@ -37,9 +40,9 @@ repository-relative links for GitHub.
 
 On Windows PowerShell, use `.\gradlew.bat` in place of `./gradlew` for every command above.
 
-The Gradle wrapper is pinned to 9.8.1 with its official distribution SHA-256. Kotlin 2.4.21 documents full
-support only through Gradle 9.7.0. Local 9.8.1 qualification covered compilation, packaging, client/server run
-preparation, and packaged-mod startup on NeoForge 26.3 with FILE storage, not an upstream compatibility
+The Gradle wrapper is pinned to 9.9.2 with its official distribution SHA-256. Kotlin 2.4.21 documents full
+support only through Gradle 9.7.0. Local 9.9.2 qualification covered compilation, packaging and client/server run
+preparation (packaged-mod startup is not yet re-run on 9.9.2), not an upstream compatibility
 guarantee. Check Kotlin and ModDevGradle compatibility and repeat qualification when changing the wrapper.
 Keep Kotlin paired with KotlinLangForge.
 
@@ -82,7 +85,7 @@ changes.
   (placeholders like `${mod_id}` are expanded from the matching Gradle property).
 - The mod declares support for Minecraft `26.1.2` through `26.3` inclusive via
   `minecraft_version_range=[26.1.2,26.4)` in `gradle.properties`. The compile/run target `neo_version` is
-  pinned to stable NeoForge `26.3.0.92`. Keep the independently declared minimum loader version unchanged
+  pinned to stable NeoForge `26.3.0.118`. Keep the independently declared minimum loader version unchanged
   unless runtime qualification requires a deliberate compatibility change.
 - `neo_version` and `neo_version_range` are deliberately separate properties: `neo_version` is the single exact
   NeoForge artifact ModDevGradle compiles and runs against, while `neo_version_range` is the floor for the
@@ -107,7 +110,7 @@ changes.
   serialization classes. Unlike a normal mod dependency, this is declared via `neoforge.mods.toml`'s top-level
   `modLoader="klf"` / `loaderVersion="[1,)"` — **not** a `[[dependencies.sethome]]` entry — because a standard
   FML dependency version check against KLF's full artifact version string
-  (`kotlinlangforge_version` in `gradle.properties`, e.g. `2.15.0-k2.4.21-3.1+neoforge`) does not work: confirmed
+  (`kotlinlangforge_version` in `gradle.properties`, e.g. `2.20.1-k2.4.21-3.1+neoforge`) does not work: confirmed
   by testing, FML reports the installed version as `[MISSING]` (unparseable as a plain Maven version) even when
   the range matches exactly. The `loaderVersion` instead checks KLF's own small "language provider version"
   (`3.1` for this release). The Kotlin Gradle plugin version in `build.gradle` (currently `2.4.21`, a literal —

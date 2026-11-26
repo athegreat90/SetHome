@@ -14,12 +14,12 @@ The current source targets:
 | Component | Version |
 | --- | --- |
 | Minecraft | 26.1.2 – 26.3 |
-| NeoForge | 26.1.2.109 or newer (built against stable 26.3.0.92) |
+| NeoForge | 26.1.2.109 or newer (built against stable 26.3.0.118) |
 | KotlinLangForge | 2.15.0-k2.4.21-3.1+neoforge or newer compatible release |
 | Java | 25 |
 
 Minecraft, NeoForge, and mod versions are defined in [gradle.properties](gradle.properties). The compile/run
-target is stable NeoForge `26.3.0.92`; the minimum loader version remains independent so older supported
+target is stable NeoForge `26.3.0.118`; the minimum loader version remains independent so older supported
 Minecraft installations are not excluded by the newer build target.
 See `MEMORY.md` for the version-compatibility decisions behind this range, including a runtime compatibility
 shim needed for a config-registration API that NeoForge renamed between the loader used for 26.1.2/26.2 and the
@@ -159,10 +159,10 @@ source file. The setting has no effect in FILE mode or when startup falls back t
 
 Install JDK **25**, clone this repository, and run the included Gradle wrapper from the repository root.
 
-SetHome `3.0.1` is a build/CI maintenance release; gameplay and the Minecraft compatibility range are unchanged.
-The wrapper pins Gradle **9.8.1** with its official distribution checksum. Kotlin `2.4.21` documents full Gradle
-support only through **9.7.0**. Local 9.8.1 qualification covered compilation, packaging, client/server run
-preparation, and packaged-mod startup on NeoForge 26.3 with FILE storage; it does not imply upstream support.
+SetHome `3.0.2` is a dependency, build and CI maintenance release; gameplay and the Minecraft compatibility range are unchanged.
+The wrapper pins Gradle **9.9.2** with its official distribution checksum. Kotlin `2.4.21` documents full Gradle
+support only through **9.7.0**. Local 9.9.2 qualification covered compilation, packaging and client/server run
+preparation; packaged-mod startup has not been re-run on 9.9.2, and none of this implies upstream support.
 Kotlin remains paired with the version bundled by KotlinLangForge.
 
 On Linux or macOS:
@@ -194,8 +194,8 @@ Useful development commands (use `.\gradlew.bat` instead of `./gradlew` on Windo
 Use a disposable world outside the repository and cloud-synced directories. A successful build does not prove
 that Minecraft loads the mod or that player commands work.
 
-1. Install a dedicated NeoForge `26.3.0.92` server using JDK 25. Put the packaged SetHome JAR and
-   KotlinLangForge `2.15.0-k2.4.21-3.1+neoforge` in its `mods/` directory.
+1. Install a dedicated NeoForge `26.3.0.118` server using JDK 25. Put the packaged SetHome JAR and
+   KotlinLangForge `2.20.1-k2.4.21-3.1+neoforge` in its `mods/` directory.
 2. Read and accept the [Minecraft EULA](https://aka.ms/MinecraftEULA) yourself before enabling `eula=true`.
    In `server.properties`, bind `server-ip=127.0.0.1` and use an available port, for example `server-port=25583`.
    Keep query and RCON disabled.
