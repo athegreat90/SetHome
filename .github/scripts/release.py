@@ -39,7 +39,7 @@ def git(*args):
 
 
 def gate(ref, before, sha, read):
-    if ref != "refs/heads/26" or before == "0" * 40:
+    if ref != "refs/heads/main" or before == "0" * 40:
         return None
     old = version_property(read(commit(before)))
     new = version_property(read(commit(sha)))
