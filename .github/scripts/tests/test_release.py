@@ -23,7 +23,7 @@ BEFORE = "b" * 40
 class GateTests(unittest.TestCase):
     def gate(self, old="1.0.0", new="2.0.0", **kwargs):
         read = Mock(side_effect=[f"mod_version={old}\n", f"mod_version={new}\n"])
-        result = release.gate(kwargs.get("ref", "refs/heads/26"),
+        result = release.gate(kwargs.get("ref", "refs/heads/main"),
                               kwargs.get("before", BEFORE), SHA, read)
         return result, read
 
@@ -38,7 +38,7 @@ class GateTests(unittest.TestCase):
 
     def test_comment_only(self):
         read = Mock(side_effect=["mod_version=1.0.0\n", "# new comment\nmod_version = 1.0.0\n"])
-        self.assertIsNone(release.gate("refs/heads/26", BEFORE, SHA, read))
+        self.assertIsNone(release.gate("refs/heads/main", BEFORE, SHA, read))
 
     def test_prerelease_skips(self):
         self.assertIsNone(self.gate(new="2.0.0-RC1")[0])
@@ -49,11 +49,16 @@ class GateTests(unittest.TestCase):
                 self.gate(new=version)
 
     def test_initial_and_wrong_branch_never_read(self):
-        for args in [{"before": "0" * 40}, {"ref": "refs/heads/260"},
+        for args in [{"before": "0" * 40}, {"ref": "refs/heads/26"}, {"ref": "refs/heads/mainline"},
                      {"ref": "refs/pull/26/merge"}]:
             result, read = self.gate(**args)
             self.assertIsNone(result)
             read.assert_not_called()
+
+    def test_gate_branch_matches_workflow_trigger(self):
+        workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+        self.assertIn("branches: ['main']", workflow)
+        self.assertEqual(self.gate()[0], "2.0.0")
 
     def test_duplicate_property_rejected(self):
         with self.assertRaises(ValueError):
